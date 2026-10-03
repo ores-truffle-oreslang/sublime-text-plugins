@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import shlex
@@ -8,7 +9,7 @@ import sublime
 import sublime_plugin
 
 
-DIAGNOSTIC_KEY = "oreslang.compiler.diagnostics"
+DIAGNOSTIC_KEY = "oreslang.cli.diagnostics"
 SETTINGS_FILE = "Oreslang.sublime-settings"
 
 _STANDARD_DIAGNOSTIC = re.compile(
@@ -47,15 +48,15 @@ def _settings():
 
 
 def _expand_command(view):
-    configured = _settings().get("compiler_command", ["ores", "--check", "$file"])
+    configured = _settings().get("cli_command", ["oreslang", "check", "--format=json", "$file"])
     if isinstance(configured, str):
         configured = shlex.split(configured, posix=os.name != "nt")
     if not isinstance(configured, list) or not configured:
-        raise ValueError("compiler_command must be a non-empty string or array")
+        raise ValueError("cli_command must be a non-empty string or array")
 
     filename = view.file_name()
     if not filename:
-        raise ValueError("save the .ores file before running compiler diagnostics")
+        raise ValueError("save the .ores file before running oreslang check")
 
     window = view.window()
     project = window.project_file_name() if window else None
@@ -78,6 +79,32 @@ def _expand_command(view):
 
 def _parse_diagnostics(output, default_file):
     diagnostics = []
+
+    try:
+        payload = json.loads(output)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        payload = None
+
+    if isinstance(payload, dict) and payload.get("version") == 1:
+        for item in payload.get("diagnostics", []):
+            if not isinstance(item, dict):
+                continue
+            start = (item.get("range") or {}).get("start") or {}
+            path = item.get("path") or default_file
+            message = str(item.get("message") or "").strip()
+            if not message:
+                continue
+            diagnostics.append(
+                {
+                    "file": os.path.abspath(path),
+                    "line": max(1, int(start.get("line", 1))),
+                    "column": max(1, int(start.get("column", 1))),
+                    "severity": str(item.get("severity") or "error").lower(),
+                    "message": message,
+                }
+            )
+        return diagnostics
+
     for raw_line in output.splitlines():
         line = raw_line.strip()
         if not line:
@@ -144,7 +171,7 @@ def _apply_diagnostics(view, diagnostics):
 
     if not regions:
         view.erase_regions(DIAGNOSTIC_KEY)
-        view.set_status("oreslang_diagnostics", "Oreslang: no compiler errors")
+        view.set_status("oreslang_diagnostics", "Oreslang: no diagnostics")
         return
 
     flags = sublime.DRAW_SQUIGGLY_UNDERLINE | sublime.DRAW_NO_FILL
@@ -225,15 +252,15 @@ def _run_check(view, force_output=False):
         diagnostics = _parse_diagnostics(output, filename)
         return_code = completed.returncode
     except FileNotFoundError:
-        output = "Oreslang compiler not found: {}".format(command[0])
+        output = "Oreslang CLI not found: {}".format(command[0])
         diagnostics = []
         return_code = 127
     except subprocess.TimeoutExpired:
-        output = "Oreslang compiler timed out after {} ms".format(timeout_ms)
+        output = "oreslang check timed out after {} ms".format(timeout_ms)
         diagnostics = []
         return_code = 124
     except Exception as error:
-        output = "Failed to run Oreslang compiler: {}".format(error)
+        output = "Failed to run oreslang check: {}".format(error)
         diagnostics = []
         return_code = 1
 
@@ -249,7 +276,7 @@ def _run_check(view, force_output=False):
         if return_code != 0 and not diagnostics:
             view.set_status(
                 "oreslang_diagnostics",
-                "Oreslang compiler failed; run Oreslang: Check File for output",
+                "oreslang check failed; run Oreslang: Check File for output",
             )
 
     sublime.set_timeout(finish, 0)
