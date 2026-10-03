@@ -1,0 +1,10 @@
+[
+  {
+    "caption": "Oreslang: Check File",
+    "command": "oreslang_check_file"
+  },
+  {
+    "caption": "Oreslang: Clear Diagnostics",
+    "command": "oreslang_clear_diagnostics"
+  }
+]
