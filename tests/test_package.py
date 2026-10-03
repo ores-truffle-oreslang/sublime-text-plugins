@@ -33,17 +33,12 @@ class PackageContractTest(unittest.TestCase):
             self.assertIn(name, global_line)
         self.assertIn("scope: support.function.global.oreslang", syntax)
 
-    def test_canonical_colors(self):
-        scheme = json.loads((ROOT / "Oreslang Magenta.sublime-color-scheme").read_text())
-        colors = {rule["scope"]: rule["foreground"] for rule in scheme["rules"]}
-        self.assertEqual("#FF00FF", colors["keyword.oreslang"])
-        self.assertEqual("#4169E1", colors["support.function.global.oreslang"])
-
     def test_json_resources_parse(self):
         for name in (
             "Default.sublime-commands",
             "Oreslang.sublime-build",
             "Oreslang.sublime-settings",
+            "Main.sublime-menu",
         ):
             with self.subTest(name=name):
                 json.loads((ROOT / name).read_text())

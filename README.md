@@ -37,14 +37,31 @@ Currently:
 recover defer throw raise
 ```
 
-The bundled **Oreslang Magenta** color scheme pins those scopes to:
+The package uses standard, stable Sublime scopes so it works with any color
+scheme. Package Control asks language-syntax packages not to bundle a
+language-specific color scheme.
 
-- keywords: magenta `#FF00FF`;
-- global controls: royal blue `#4169E1`.
+If you want Oreslang's canonical colors, use **Preferences → Customize Color
+Scheme** and add these rules to your user color scheme:
 
-Select it with **Preferences → Select Color Scheme → Oreslang Magenta** when you
-want the exact canonical colors. Other Sublime color schemes still receive the
-stable Oreslang scopes and may style them differently.
+```json
+{
+  "rules": [
+    {
+      "scope": "keyword.oreslang",
+      "foreground": "#FF00FF"
+    },
+    {
+      "scope": "support.function.global.oreslang",
+      "foreground": "#4169E1"
+    }
+  ]
+}
+```
+
+That preserves exact magenta for language keywords and royal blue for
+`recover`, `defer`, `throw`, and `raise` without making the syntax package
+depend on a bundled theme.
 
 ## Compiler diagnostics
 
