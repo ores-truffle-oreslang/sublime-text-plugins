@@ -109,6 +109,8 @@ class DiagnosticParserTest(unittest.TestCase):
         self.assertEqual("/tmp/demo.ores", items[0]["file"])
         self.assertEqual(8, items[0]["line"])
         self.assertEqual(4, items[0]["column"])
+        self.assertEqual(8, items[0]["end_line"])
+        self.assertEqual(5, items[0]["end_column"])
         self.assertEqual("unknown binding", items[0]["message"])
 
     def test_standard_diagnostic(self):
