@@ -51,7 +51,7 @@ stable Oreslang scopes and may style them differently.
 The plugin defaults to:
 
 ```text
-ores --check $file
+oreslang check --format=json $file
 ```
 
 Diagnostics in this shape are converted into Sublime squigglies and inline
