@@ -2,5 +2,5 @@
   "selector": "source.oreslang",
   "cmd": ["oreslang", "check", "$file"],
   "working_dir": "$file_path",
-  "file_regex": "^(.+?):([0-9]+):([0-9]+):\\s*(?:error|warning|info|hint):\\s*(.*)$"
+  "file_regex": "^(.+?):([0-9]+):([0-9]+):\\s*(?:error|warning|info|hint)(?:\\[[^\\]]+\\])?:\\s*(.*)$"
 }
