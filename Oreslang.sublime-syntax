@@ -1,0 +1,97 @@
+%YAML 1.2
+---
+name: Oreslang
+file_extensions:
+  - ores
+scope: source.oreslang
+
+variables:
+  identifier: '[A-Za-z_][A-Za-z0-9_]*'
+  global_controls: '\b(?:recover|defer|throw|raise)\b'
+  keywords: '\b(?:abstract|actor|arr|as|async|await|case|catch|class|const|def|define|do|done|elif|else|elseif|end|extends|false|fi|finally|fnc|for|from|gpu|if|impl|implements|import|interface|is|isoactor|let|lex|match|module|mut|namespace|new|nlex|null|obj|of|private|pub|return|routine|select|self|shared|singleton|static|struct|structural|super|switch|then|true|try|type|typeof|val|void|yield)\b'
+  builtin_types: '\b(?:any|bool|byte|char|decimal|double|duration|float|float32|float64|int|int8|int16|int32|int64|never|number|string|String|uint|uint8|uint16|uint32|uint64|unknown|usize|isize)\b'
+
+contexts:
+  main:
+    - include: comments
+    - include: strings
+
+    # These are intentionally scoped separately from syntax keywords.
+    # The companion color scheme renders them royal blue.
+    - match: '{{global_controls}}'
+      scope: support.function.global.oreslang
+
+    # Declaration heads keep the declaration keyword in the one canonical
+    # Oreslang keyword scope while giving the declared symbol a useful scope.
+    - match: '\b(class|module|interface|struct)\s+({{identifier}})'
+      captures:
+        1: keyword.oreslang
+        2: entity.name.type.oreslang
+    - match: '\b(fnc|routine)\s+({{identifier}})'
+      captures:
+        1: keyword.oreslang
+        2: entity.name.function.oreslang
+
+    # ALL language keywords use the exact same scope by design.
+    - match: '{{keywords}}'
+      scope: keyword.oreslang
+
+    - match: '@{{identifier}}'
+      scope: storage.type.annotation.oreslang
+
+    - match: '{{builtin_types}}'
+      scope: support.type.builtin.oreslang
+
+    - match: '\b(?:0[xX][0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0[bB][01](?:_?[01])*|0[oO][0-7](?:_?[0-7])*|[0-9](?:_?[0-9])*(?:\.[0-9](?:_?[0-9])*)?(?:[eE][+-]?[0-9](?:_?[0-9])*)?i?)\b'
+      scope: constant.numeric.oreslang
+
+    - match: '\b({{identifier}})(?=\s*\()'
+      scope: variable.function.oreslang
+
+    - match: '=>|->|==|!=|<=|>=|<<|>>>|>>|&&|\|\||\^\^|[+\-*/%=&|^~!<>?:]'
+      scope: keyword.operator.oreslang
+
+    - match: '[{}\[\]()]'
+      scope: punctuation.section.oreslang
+    - match: '[,.;]'
+      scope: punctuation.separator.oreslang
+
+  comments:
+    - match: '//'
+      scope: punctuation.definition.comment.oreslang
+      push:
+        - meta_scope: comment.line.double-slash.oreslang
+        - match: '$'
+          pop: true
+    - match: '/\*'
+      scope: punctuation.definition.comment.begin.oreslang
+      push: block-comment
+
+  block-comment:
+    - meta_scope: comment.block.oreslang
+    - match: '/\*'
+      scope: punctuation.definition.comment.begin.oreslang
+      push: block-comment
+    - match: '\*/'
+      scope: punctuation.definition.comment.end.oreslang
+      pop: true
+
+  strings:
+    - match: '"'
+      scope: punctuation.definition.string.begin.oreslang
+      push:
+        - meta_scope: string.quoted.double.oreslang
+        - match: '\\(?:["\\/bfnrt]|u[0-9A-Fa-f]{4})'
+          scope: constant.character.escape.oreslang
+        - match: '"'
+          scope: punctuation.definition.string.end.oreslang
+          pop: true
+    - match: "'"
+      scope: punctuation.definition.string.begin.oreslang
+      push:
+        - meta_scope: string.quoted.single.oreslang
+        - match: "\\\\(?:['\\\\/bfnrt]|u[0-9A-Fa-f]{4})"
+          scope: constant.character.escape.oreslang
+        - match: "'"
+          scope: punctuation.definition.string.end.oreslang
+          pop: true
