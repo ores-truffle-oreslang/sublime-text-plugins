@@ -7,7 +7,7 @@ Sublime Text 4 support for Oreslang:
 - a separate scope for global control forms;
 - compiler-backed error squigglies and inline annotations;
 - an `Oreslang: Check File` command;
-- an `ores --check` build target.
+- an `oreslang check` build target.
 
 ## Color contract
 
@@ -71,11 +71,11 @@ customize `Oreslang.sublime-settings`:
   "diagnostics_on_save": true,
   "diagnostics_on_change": true,
   "diagnostics_delay_ms": 650,
-  "compiler_command": ["ores", "--check", "$file"]
+  "cli_command": ["oreslang", "check", "--format=json", "$file"]
 }
 ```
 
-The compiler command is an argument array, not a shell command. Supported
+The CLI command is an argument array, not a shell command. Supported
 substitutions are `$file`, `$file_path`, `$file_name`, `$project`, and
 `$project_path`.
 
@@ -86,7 +86,7 @@ Open the command palette and use:
 - **Oreslang: Check File** — run the compiler immediately and show its output;
 - **Oreslang: Clear Diagnostics** — remove current squigglies.
 
-Sublime's normal **Build** command also uses `ores --check` for Oreslang files.
+Sublime's normal **Build** command uses `oreslang check` for Oreslang files. The package never invokes `ORESoftware/ores-cli` or a command named `ores`.
 
 ## Development
 
