@@ -61,7 +61,7 @@ annotations:
 /path/to/file.ores:12:7: error: expected expression
 ```
 
-The Oreslang compiler's native lexer/parser messages are also recognized.
+The canonical `oreslang` CLI protocol v1 JSON is preferred; plain compiler-style diagnostics remain a compatibility fallback.
 
 By default diagnostics run after save. To enable debounced checks while typing,
 customize `Oreslang.sublime-settings`:
@@ -83,7 +83,7 @@ substitutions are `$file`, `$file_path`, `$file_name`, `$project`, and
 
 Open the command palette and use:
 
-- **Oreslang: Check File** — run the compiler immediately and show its output;
+- **Oreslang: Check File** — run `oreslang check` immediately and show its output;
 - **Oreslang: Clear Diagnostics** — remove current squigglies.
 
 Sublime's normal **Build** command uses `oreslang check` for Oreslang files. The package never invokes `ORESoftware/ores-cli` or a command named `ores`.
