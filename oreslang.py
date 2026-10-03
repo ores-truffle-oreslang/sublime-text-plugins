@@ -89,7 +89,9 @@ def _parse_diagnostics(output, default_file):
         for item in payload.get("diagnostics", []):
             if not isinstance(item, dict):
                 continue
-            start = (item.get("range") or {}).get("start") or {}
+            item_range = item.get("range") or {}
+            start = item_range.get("start") or {}
+            end = item_range.get("end") or start
             path = item.get("path") or default_file
             message = str(item.get("message") or "").strip()
             if not message:
@@ -99,6 +101,8 @@ def _parse_diagnostics(output, default_file):
                     "file": os.path.abspath(path),
                     "line": max(1, int(start.get("line", 1))),
                     "column": max(1, int(start.get("column", 1))),
+                    "end_line": max(1, int(end.get("line", start.get("line", 1)))),
+                    "end_column": max(1, int(end.get("column", start.get("column", 1) + 1))),
                     "severity": str(item.get("severity") or "error").lower(),
                     "message": message,
                 }
@@ -118,6 +122,8 @@ def _parse_diagnostics(output, default_file):
                     "file": os.path.abspath(path) if path else default_file,
                     "line": max(1, int(row)),
                     "column": max(1, int(column)),
+                    "end_line": max(1, int(row)),
+                    "end_column": max(2, int(column) + 1),
                     "severity": (severity or "error").lower(),
                     "message": message.strip(),
                 }
@@ -132,6 +138,8 @@ def _parse_diagnostics(output, default_file):
                     "file": default_file,
                     "line": max(1, int(row)),
                     "column": max(1, int(column)),
+                    "end_line": max(1, int(row)),
+                    "end_column": max(2, int(column) + 1),
                     "severity": "error",
                     "message": message.strip(),
                 }
@@ -145,6 +153,13 @@ def _region_for_diagnostic(view, diagnostic):
     point = view.text_point(row, column, clamp_column=True)
     if point >= view.size():
         point = max(0, view.size() - 1)
+
+    end_line = diagnostic.get("end_line")
+    end_column = diagnostic.get("end_column")
+    if end_line is not None and end_column is not None:
+        end = view.text_point(end_line - 1, end_column - 1, clamp_column=True)
+        if end > point:
+            return sublime.Region(point, min(view.size(), end))
 
     word = view.word(point)
     if word.empty():
