@@ -48,6 +48,17 @@ class PackageContractTest(unittest.TestCase):
             with self.subTest(name=name):
                 json.loads((ROOT / name).read_text())
 
+    def test_editor_commands_use_canonical_oreslang_cli(self):
+        build = json.loads((ROOT / "Oreslang.sublime-build").read_text())
+        settings = json.loads((ROOT / "Oreslang.sublime-settings").read_text())
+        self.assertEqual(["oreslang", "check", "$file"], build["cmd"])
+        self.assertEqual(
+            ["oreslang", "check", "--format=json", "$file"],
+            settings["cli_command"],
+        )
+        self.assertNotIn("ores", build["cmd"])
+        self.assertNotIn("ores", settings["cli_command"])
+
     def test_plugin_python_compiles(self):
         source = (ROOT / "oreslang.py").read_text()
         compile(source, str(ROOT / "oreslang.py"), "exec")
@@ -71,6 +82,34 @@ class DiagnosticParserTest(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         cls.plugin = module
+
+    def test_oreslang_cli_json_diagnostic(self):
+        items = self.plugin._parse_diagnostics(
+            json.dumps(
+                {
+                    "version": 1,
+                    "ok": False,
+                    "diagnostics": [
+                        {
+                            "version": 1,
+                            "path": "/tmp/demo.ores",
+                            "range": {
+                                "start": {"line": 8, "column": 4},
+                                "end": {"line": 8, "column": 5},
+                            },
+                            "severity": "error",
+                            "message": "unknown binding",
+                        }
+                    ],
+                }
+            ),
+            "/tmp/demo.ores",
+        )
+        self.assertEqual(1, len(items))
+        self.assertEqual("/tmp/demo.ores", items[0]["file"])
+        self.assertEqual(8, items[0]["line"])
+        self.assertEqual(4, items[0]["column"])
+        self.assertEqual("unknown binding", items[0]["message"])
 
     def test_standard_diagnostic(self):
         items = self.plugin._parse_diagnostics(
