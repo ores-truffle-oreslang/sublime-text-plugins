@@ -1,0 +1,9 @@
+{
+  "diagnostics_on_save": true,
+  "diagnostics_on_change": false,
+  "diagnostics_delay_ms": 650,
+  "diagnostics_timeout_ms": 15000,
+  "show_diagnostic_annotations": true,
+  "show_compiler_output_on_error": false,
+  "compiler_command": ["ores", "--check", "$file"]
+}
