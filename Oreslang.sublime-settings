@@ -5,5 +5,5 @@
   "diagnostics_timeout_ms": 15000,
   "show_diagnostic_annotations": true,
   "show_compiler_output_on_error": false,
-  "compiler_command": ["ores", "--check", "$file"]
+  "cli_command": ["oreslang", "check", "--format=json", "$file"]
 }
