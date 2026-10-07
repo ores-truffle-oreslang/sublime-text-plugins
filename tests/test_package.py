@@ -23,6 +23,16 @@ class PackageContractTest(unittest.TestCase):
             self.assertIn(keyword, keyword_line)
         self.assertIn("scope: keyword.oreslang", syntax)
 
+    def test_new_compiler_constructs_are_highlighted(self):
+        syntax = (ROOT / "Oreslang.sublime-syntax").read_text()
+        keyword_line = next(
+            line for line in syntax.splitlines() if line.strip().startswith("keywords:")
+        )
+        names = set(keyword_line.split("(?:", 1)[1].split(")", 1)[0].split("|"))
+        for keyword in ("do", "match", "over", "select", "nb", "case",
+                        "readch", "writech", "while", "const", "val", "let", "mut"):
+            self.assertIn(keyword, names)
+
     def test_global_controls_are_separate(self):
         syntax = (ROOT / "Oreslang.sublime-syntax").read_text()
         global_line = next(

@@ -8,7 +8,7 @@ scope: source.oreslang
 variables:
   identifier: '[A-Za-z_][A-Za-z0-9_]*'
   global_controls: '\b(?:recover|defer|throw|raise)\b'
-  keywords: '\b(?:abstract|actor|arr|as|async|await|case|catch|class|const|def|define|do|done|elif|else|elseif|end|extends|false|fi|finally|fnc|for|from|gpu|if|impl|implements|import|interface|is|isoactor|let|lex|match|module|mut|namespace|new|nlex|null|obj|of|private|pub|return|routine|select|self|shared|singleton|static|struct|structural|super|switch|then|true|try|type|typeof|val|void|yield)\b'
+  keywords: '\b(?:abstract|actor|arr|as|block|break|continue|default|loop|nb|over|readch|rt|writech|while|async|await|case|catch|class|const|def|define|do|done|elif|else|elseif|end|extends|false|fi|finally|fnc|for|from|gpu|if|impl|implements|import|interface|is|isoactor|let|lex|match|module|mut|namespace|new|nlex|null|obj|of|private|pub|return|routine|select|self|shared|singleton|static|struct|structural|super|switch|then|true|try|type|typeof|val|void|yield)\b'
   builtin_types: '\b(?:any|bool|byte|char|decimal|double|duration|float|float32|float64|int|int8|int16|int32|int64|never|number|string|String|uint|uint8|uint16|uint32|uint64|unknown|usize|isize)\b'
 
 contexts:

@@ -116,3 +116,7 @@ python -m py_compile oreslang.py
 
 The tests pin the requested magenta keyword set, royal-blue global set, exact
 hex colors, JSON resources, and diagnostic parser formats.
+
+### Compiler compatibility
+
+The editor grammar tracks proposed compiler constructs without changing compiler acceptance. See [docs/compiler-pr-sync.md](docs/compiler-pr-sync.md) for the October 2026 upstream PR matrix and validation gates.
