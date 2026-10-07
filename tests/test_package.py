@@ -28,10 +28,10 @@ class PackageContractTest(unittest.TestCase):
         keyword_line = next(
             line for line in syntax.splitlines() if line.strip().startswith("keywords:")
         )
-        import re
+        names = set(keyword_line.split("(?:", 1)[1].split(")", 1)[0].split("|"))
         for keyword in ("do", "match", "over", "select", "nb", "case",
                         "readch", "writech", "while", "const", "val", "let", "mut"):
-            self.assertRegex(keyword_line, r"\\b" + re.escape(keyword) + r"\\b")
+            self.assertIn(keyword, names)
 
     def test_global_controls_are_separate(self):
         syntax = (ROOT / "Oreslang.sublime-syntax").read_text()
