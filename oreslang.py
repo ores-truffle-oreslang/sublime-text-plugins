@@ -68,13 +68,14 @@ def _expand_command(view):
         "$project_path": os.path.dirname(project) if project else os.path.dirname(filename),
     }
 
-    command = []
-    for raw in configured:
-        value = str(raw)
-        for token, replacement in values.items():
-            value = value.replace(token, replacement)
-        command.append(value)
-    return command
+    # Expand tokens in one pass. Sequential str.replace() corrupts
+    # $file_path/$file_name via their $file prefix, and recursively expands
+    # literal $project-like text appearing inside filenames and directories.
+    placeholder = re.compile(r"\\$(?:file_path|file_name|project_path|project|file)(?![A-Za-z0-9_])")
+    return [
+        placeholder.sub(lambda match: values[match.group(0)], str(raw))
+        for raw in configured
+    ]
 
 
 def _parse_diagnostics(output, default_file):
