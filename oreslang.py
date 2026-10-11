@@ -87,25 +87,57 @@ def _parse_diagnostics(output, default_file):
         payload = None
 
     if isinstance(payload, dict) and payload.get("version") == 1:
-        for item in payload.get("diagnostics", []):
+        records = payload.get("diagnostics")
+        if not isinstance(records, list):
+            return diagnostics
+        for item in records:
             if not isinstance(item, dict):
                 continue
             item_range = item.get("range") or {}
-            start = item_range.get("start") or {}
-            end = item_range.get("end") or start
-            path = item.get("path") or default_file
-            message = str(item.get("message") or "").strip()
-            if not message:
+            if not isinstance(item_range, dict):
                 continue
+            start = item_range.get("start") or {}
+            end = item_range.get("end") or {}
+            if not isinstance(start, dict) or not isinstance(end, dict):
+                continue
+
+            def position(value, default):
+                if value is None:
+                    return default
+                # bool is an int subclass; reject it along with floats,
+                # negative values and implausibly large editor coordinates.
+                if type(value) is not int or not 1 <= value <= 10_000_000:
+                    return None
+                return value
+
+            row = position(start.get("line"), 1)
+            column = position(start.get("column"), 1)
+            if row is None or column is None:
+                continue
+            end_row = position(end.get("line"), row)
+            end_column = position(end.get("column"), column + 1 if end_row == row else 1)
+            if (end_row is None or end_column is None or end_row < row
+                    or (end_row == row and end_column <= column)):
+                continue
+            path = item.get("path")
+            if not isinstance(path, str) or not path:
+                path = default_file
+            message = item.get("message")
+            if not isinstance(message, str) or not message.strip():
+                continue
+            severity = item.get("severity")
+            severity = severity.lower() if isinstance(severity, str) else "error"
+            if severity not in ("error", "warning", "info", "hint"):
+                severity = "error"
             diagnostics.append(
                 {
                     "file": os.path.abspath(path),
-                    "line": max(1, int(start.get("line", 1))),
-                    "column": max(1, int(start.get("column", 1))),
-                    "end_line": max(1, int(end.get("line", start.get("line", 1)))),
-                    "end_column": max(1, int(end.get("column", start.get("column", 1) + 1))),
-                    "severity": str(item.get("severity") or "error").lower(),
-                    "message": message,
+                    "line": row,
+                    "column": column,
+                    "end_line": end_row,
+                    "end_column": end_column,
+                    "severity": severity,
+                    "message": message.strip(),
                 }
             )
         return diagnostics
