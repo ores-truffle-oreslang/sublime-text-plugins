@@ -120,6 +120,36 @@ class DiagnosticParserTest(unittest.TestCase):
             "/tmp/source", "$file_extra"
         ], command)
 
+    def test_malformed_json_diagnostics_do_not_crash_or_corrupt_positions(self):
+        payload = {
+            "version": 1,
+            "diagnostics": [
+                {"message": "not a record", "range": [1, 2]},
+                {"message": "bad range", "range": {"start": "x"}},
+                {"message": "NaN", "range": {"start": {"line": "NaN"}}},
+                {"message": "negative", "range": {"start": {"line": -1}}},
+                {"message": "infinity", "range": {"start": {"line": 1e99}}},
+                {"message": "boolean", "range": {"start": {"column": True}}},
+                {"message": "bad end", "range": {"start": {"line": 7, "column": 3},
+                    "end": {"line": 6, "column": 2}}},
+                {"message": "valid multiline", "path": {"not": "a string"},
+                 "severity": "unknown", "range": {
+                     "start": {"line": 7, "column": 20},
+                     "end": {"line": 8, "column": 2}}},
+            ],
+        }
+        records = self.plugin._parse_diagnostics(json.dumps(payload), "/tmp/fallback.ores")
+        self.assertEqual(1, len(records))
+        self.assertEqual("valid multiline", records[0]["message"])
+        self.assertEqual(7, records[0]["line"])
+        self.assertEqual(20, records[0]["column"])
+        self.assertEqual(8, records[0]["end_line"])
+        self.assertEqual(2, records[0]["end_column"])
+        self.assertEqual("error", records[0]["severity"])
+        self.assertEqual("/tmp/fallback.ores", records[0]["file"])
+        self.assertEqual([], self.plugin._parse_diagnostics(
+            json.dumps({"version": 1, "diagnostics": None}), "/tmp/a.ores"))
+
     def test_oreslang_cli_json_diagnostic(self):
         items = self.plugin._parse_diagnostics(
             json.dumps(
