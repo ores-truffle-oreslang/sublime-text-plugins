@@ -88,6 +88,38 @@ class DiagnosticParserTest(unittest.TestCase):
         spec.loader.exec_module(module)
         cls.plugin = module
 
+    def test_command_placeholder_expansion_is_atomic_and_nonrecursive(self):
+        class Settings:
+            def get(self, key, default=None):
+                if key == "cli_command":
+                    return ["oreslang", "$file", "$file_path", "$file_name",
+                            "$project", "$project_path", "$file_extra"]
+                return default
+
+        class Window:
+            def project_file_name(self):
+                return "/tmp/source/workspace.sublime-project"
+
+        class View:
+            def file_name(self):
+                return "/tmp/dir$project/sample.ores"
+
+            def window(self):
+                return Window()
+
+        original = self.plugin._settings
+        self.plugin._settings = lambda: Settings()
+        try:
+            command = self.plugin._expand_command(View())
+        finally:
+            self.plugin._settings = original
+
+        self.assertEqual([
+            "oreslang", "/tmp/dir$project/sample.ores", "/tmp/dir$project",
+            "sample.ores", "/tmp/source/workspace.sublime-project",
+            "/tmp/source", "$file_extra"
+        ], command)
+
     def test_oreslang_cli_json_diagnostic(self):
         items = self.plugin._parse_diagnostics(
             json.dumps(
