@@ -71,7 +71,7 @@ def _expand_command(view):
     # Expand tokens in one pass. Sequential str.replace() corrupts
     # $file_path/$file_name via their $file prefix, and recursively expands
     # literal $project-like text appearing inside filenames and directories.
-    placeholder = re.compile(r"\\$(?:file_path|file_name|project_path|project|file)(?![A-Za-z0-9_])")
+    placeholder = re.compile(r"\$(?:file_path|file_name|project_path|project|file)(?![A-Za-z0-9_])")
     return [
         placeholder.sub(lambda match: values[match.group(0)], str(raw))
         for raw in configured
