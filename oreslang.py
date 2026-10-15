@@ -78,6 +78,15 @@ def _expand_command(view):
     ]
 
 
+def _text_coordinate(value):
+    # Bound the decimal string before int(): Python may reject extremely long
+    # integers, and an editor position must never be arbitrarily large.
+    if not value.isascii() or not value.isdecimal() or len(value) > 8:
+        return None
+    number = int(value)
+    return number if 1 <= number < 10_000_000 else None
+
+
 def _parse_diagnostics(output, default_file):
     diagnostics = []
 
@@ -86,7 +95,9 @@ def _parse_diagnostics(output, default_file):
     except (TypeError, ValueError, json.JSONDecodeError):
         payload = None
 
-    if isinstance(payload, dict) and payload.get("version") == 1:
+    if isinstance(payload, dict):
+        if type(payload.get("version")) is not int or payload["version"] != 1:
+            return diagnostics
         records = payload.get("diagnostics")
         if not isinstance(records, list):
             return diagnostics
@@ -150,13 +161,16 @@ def _parse_diagnostics(output, default_file):
         match = _STANDARD_DIAGNOSTIC.match(line)
         if match:
             path, row, column, severity, message = match.groups()
+            row, column = _text_coordinate(row), _text_coordinate(column)
+            if row is None or column is None:
+                continue
             diagnostics.append(
                 {
                     "file": os.path.abspath(path) if path else default_file,
-                    "line": max(1, int(row)),
-                    "column": max(1, int(column)),
-                    "end_line": max(1, int(row)),
-                    "end_column": max(2, int(column) + 1),
+                    "line": row,
+                    "column": column,
+                    "end_line": row,
+                    "end_column": column + 1,
                     "severity": (severity or "error").lower(),
                     "message": message.strip(),
                 }
@@ -166,13 +180,16 @@ def _parse_diagnostics(output, default_file):
         match = _ORESLANG_DIAGNOSTIC.search(line)
         if match:
             row, column, message = match.groups()
+            row, column = _text_coordinate(row), _text_coordinate(column)
+            if row is None or column is None:
+                continue
             diagnostics.append(
                 {
                     "file": default_file,
-                    "line": max(1, int(row)),
-                    "column": max(1, int(column)),
-                    "end_line": max(1, int(row)),
-                    "end_column": max(2, int(column) + 1),
+                    "line": row,
+                    "column": column,
+                    "end_line": row,
+                    "end_column": column + 1,
                     "severity": "error",
                     "message": message.strip(),
                 }

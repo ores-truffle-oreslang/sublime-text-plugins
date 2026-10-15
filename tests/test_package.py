@@ -180,6 +180,19 @@ class DiagnosticParserTest(unittest.TestCase):
         self.assertEqual(5, items[0]["end_column"])
         self.assertEqual("unknown binding", items[0]["message"])
 
+    def test_plain_text_coordinates_have_the_same_bounded_admission(self):
+        for row, col in [('0','1'),('1','0'),('10000001','2'),('2','10000001'),
+                         ('9'*5000,'1'),('1','9'*5000),('١','1')]:
+            for prefix in ('/tmp/demo.ores:{0}:{1}: error: bad',
+                           'Oreslang parse error at {0}:{1}: bad'):
+                self.assertEqual([], self.plugin._parse_diagnostics(prefix.format(row,col), '/tmp/a.ores'))
+
+    def test_machine_version_cannot_be_a_boolean_float_or_string(self):
+        for version in (True, 1.0, '1'):
+            output=json.dumps({'version':version,'diagnostics':[
+                {'line':2,'message':'Oreslang parse error at 2:3: unsupported version'}]})
+            self.assertEqual([],self.plugin._parse_diagnostics(output,'/tmp/a.ores'))
+
     def test_standard_diagnostic(self):
         items = self.plugin._parse_diagnostics(
             "/tmp/demo.ores:7:11: error: expected expression", "/tmp/demo.ores"
