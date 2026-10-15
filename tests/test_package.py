@@ -1,6 +1,8 @@
 import importlib.util
 import json
 import pathlib
+import subprocess
+import tempfile
 import sys
 import types
 import unittest
@@ -192,6 +194,18 @@ class DiagnosticParserTest(unittest.TestCase):
             output=json.dumps({'version':version,'diagnostics':[
                 {'line':2,'message':'Oreslang parse error at 2:3: unsupported version'}]})
             self.assertEqual([],self.plugin._parse_diagnostics(output,'/tmp/a.ores'))
+
+    def test_live_compiler_output_is_bounded_on_both_pipes(self):
+        with tempfile.TemporaryDirectory() as cwd:
+            for fd in (1, 2):
+                with self.subTest(fd=fd), self.assertRaisesRegex(RuntimeError, 'output budget'):
+                    self.plugin._run_compiler_bounded(
+                        [sys.executable, '-c', f"import os;os.write({fd},b'x'*2000000)"], cwd, 3, max_bytes=32768)
+            result = self.plugin._run_compiler_bounded(
+                [sys.executable, '-c', "import sys;print('diagnostic');print('warning',file=sys.stderr);sys.exit(1)"], cwd, 3)
+            self.assertEqual((result.returncode, result.stdout, result.stderr), (1, 'diagnostic\n', 'warning\n'))
+            with self.assertRaises(subprocess.TimeoutExpired):
+                self.plugin._run_compiler_bounded([sys.executable, '-c', 'import time;time.sleep(10)'], cwd, 0.1)
 
     def test_standard_diagnostic(self):
         items = self.plugin._parse_diagnostics(
