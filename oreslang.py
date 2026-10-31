@@ -2,6 +2,7 @@ import itertools
 import json
 import os
 import re
+import signal
 import shlex
 import subprocess
 import threading
@@ -306,10 +307,27 @@ def _show_output(view, command, return_code, output):
     window.run_command("show_panel", {"panel": "output.oreslang"})
 
 
+def _terminate_process_tree(process):
+    """Stop the POSIX CLI process group, including inherited-pipe helpers."""
+    if os.name == 'posix' and process.pid:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+            return
+        except ProcessLookupError:
+            return
+        except OSError:
+            pass
+    try:
+        process.kill()
+    except OSError:
+        pass
+
+
 def _run_compiler_bounded(argv, cwd, timeout, max_bytes=1024 * 1024, cancelled=None):
     if timeout <= 0 or max_bytes <= 0:
         raise ValueError('positive timeout and output budget required')
-    process = subprocess.Popen(argv, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(argv, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               start_new_session=(os.name == 'posix'))
     chunks = [bytearray(), bytearray()]
     lock = threading.Lock()
     exceeded = threading.Event()
@@ -328,7 +346,7 @@ def _run_compiler_bounded(argv, cwd, timeout, max_bytes=1024 * 1024, cancelled=N
                     total += len(block)
                     if total > max_bytes:
                         exceeded.set()
-                        process.kill()
+                        _terminate_process_tree(process)
         finally:
             pipe.close()
 
@@ -340,12 +358,12 @@ def _run_compiler_bounded(argv, cwd, timeout, max_bytes=1024 * 1024, cancelled=N
     try:
         while True:
             if cancelled is not None and cancelled():
-                process.kill()
+                _terminate_process_tree(process)
                 process.wait()
                 raise _CompilerCheckCancelled()
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                process.kill()
+                _terminate_process_tree(process)
                 process.wait()
                 raise subprocess.TimeoutExpired(argv, timeout)
             try:
@@ -354,6 +372,8 @@ def _run_compiler_bounded(argv, cwd, timeout, max_bytes=1024 * 1024, cancelled=N
             except subprocess.TimeoutExpired:
                 continue
     finally:
+        # Even a successful leader exit may leave helpers holding open pipes.
+        _terminate_process_tree(process)
         for reader in readers:
             reader.join(timeout=1)
     if any(reader.is_alive() for reader in readers):
@@ -474,7 +494,11 @@ class OreslangDiagnosticsListener(sublime_plugin.EventListener):
         view.erase_status("oreslang_diagnostics")
         if not _settings().get("diagnostics_on_change", False):
             return
-        delay = int(_settings().get("diagnostics_delay_ms", 650))
+        try:
+            delay = int(_settings().get("diagnostics_delay_ms", 650))
+        except (ValueError, OverflowError, TypeError):
+            delay = 650
+        delay = max(0, min(5000, delay))
 
         def delayed():
             if view.is_valid() and _generation_is_current(view_id, generation):

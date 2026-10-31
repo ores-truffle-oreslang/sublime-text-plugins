@@ -109,5 +109,55 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual([],pending)
         self.assertEqual([],view.erased_regions)
 
+
+    def test_posix_cancelled_compiler_cannot_leave_grandchild_writing_after_kill(self):
+        if os.name != 'posix':
+            self.skipTest('POSIX process groups; Windows child-only termination not verified')
+        import tempfile
+        module, _, _ = load_plugin()
+        with tempfile.TemporaryDirectory(prefix='oreslang-tree-') as folder:
+            marker = os.path.join(folder, 'escaped-child')
+            worker = (
+                "import subprocess,sys,time;"
+                "subprocess.Popen([sys.executable,'-c',"
+                "'import time,pathlib,sys;time.sleep(0.65);pathlib.Path(sys.argv[1]).write_text(\"escaped\")',"
+                "sys.argv[1]],stdout=sys.stdout,stderr=sys.stderr);"
+                "print('ready',flush=True);time.sleep(8)"
+            )
+            cancel = threading.Event()
+            errors = []
+            def run():
+                try:
+                    module._run_compiler_bounded(
+                        [sys.executable,'-c',worker,marker],
+                        folder, 4, cancelled=cancel.is_set)
+                except BaseException as exc:
+                    errors.append(exc)
+            t=threading.Thread(target=run, daemon=True)
+            t.start()
+            time.sleep(0.3)
+            cancel.set()
+            t.join(timeout=3)
+            self.assertFalse(t.is_alive(),'cancelled CLI worker must exit promptly')
+            self.assertEqual(len(errors),1)
+            self.assertIsInstance(errors[0], module._CompilerCheckCancelled)
+            time.sleep(0.65)
+            self.assertFalse(os.path.exists(marker),'grandchild escaped CLI process-group cancellation')
+
+    def test_pending_debounce_is_revoked_on_close_and_delay_is_bounded(self):
+        module, sublime, pending = load_plugin()
+        view=FakeView()
+        sublime.load_settings=lambda name: types.SimpleNamespace(
+            get=lambda key, default=None: {
+                'diagnostics_on_change': True,
+                'diagnostics_delay_ms': 1000000000
+            }.get(key, default))
+        module.OreslangDiagnosticsListener().on_modified_async(view)
+        self.assertEqual(len(pending),1)
+        module.OreslangDiagnosticsListener().on_close(view)
+        module._run_check=lambda *args, **kwargs: self.fail('stale debounced CLI executed')
+        pending.pop()()
+        self.assertNotIn(view.id(),module._generations)
+
 if __name__=='__main__':
     unittest.main()
