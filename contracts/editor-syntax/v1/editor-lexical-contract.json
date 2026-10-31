@@ -1,0 +1,319 @@
+{
+  "version": 1,
+  "kind": "oreslang-editor-lexical-contract",
+  "status": "compiler-lexer-snapshot-plus-editor-preview; NOT parser or backend acceptance",
+  "compilerSnapshot": {
+    "repository": "ores-truffle-oreslang/oreslang-source.java",
+    "lexerPath": "src/main/java/dev/oreslang/parser/Lexer.java",
+    "lexerBlobSha": "bba9e091c0ad1c9b75e0c61e9dd173fcc18a236a",
+    "tokenPath": "src/main/java/dev/oreslang/parser/Token.java",
+    "tokenBlobSha": "c82b527e2f6c6c0b941c8bdca69bb78b53159965",
+    "grammarPath": "docs/grammar.ebnf",
+    "grammarBlobSha": "7ecfe82817945a1972cf9ac47df3466efab1822b"
+  },
+  "reservedWords": [
+    "abstract",
+    "actor",
+    "arr",
+    "as",
+    "async",
+    "await",
+    "block",
+    "break",
+    "catch",
+    "cb",
+    "class",
+    "conforms",
+    "const",
+    "continue",
+    "contract",
+    "cpu",
+    "def",
+    "default",
+    "defer",
+    "define",
+    "do",
+    "done",
+    "elif",
+    "else",
+    "elseif",
+    "end",
+    "eq",
+    "extends",
+    "false",
+    "fi",
+    "finally",
+    "fnc",
+    "for",
+    "from",
+    "generator",
+    "gpu",
+    "if",
+    "impl",
+    "implements",
+    "import",
+    "interface",
+    "is",
+    "isoactor",
+    "let",
+    "loop",
+    "match",
+    "matches",
+    "module",
+    "mut",
+    "namespace",
+    "nb",
+    "neq",
+    "new",
+    "nlex",
+    "null",
+    "obj",
+    "of",
+    "over",
+    "panic",
+    "private",
+    "pub",
+    "quantum",
+    "raise",
+    "readch",
+    "recover",
+    "return",
+    "routine",
+    "rt",
+    "select",
+    "self",
+    "shared",
+    "spawn",
+    "static",
+    "stop",
+    "struct",
+    "super",
+    "suspends",
+    "switch",
+    "then",
+    "throw",
+    "trait",
+    "trap",
+    "true",
+    "try",
+    "type",
+    "typeof",
+    "types",
+    "untrusted",
+    "val",
+    "void",
+    "while",
+    "writech",
+    "yield"
+  ],
+  "runtimeControlWords": [
+    "recover",
+    "defer",
+    "throw",
+    "raise"
+  ],
+  "comparisonOperatorWords": [
+    "eq",
+    "neq",
+    "is"
+  ],
+  "operatorTokenCharacters": [
+    "%",
+    "^"
+  ],
+  "symbolLiterals": [
+    "#ready",
+    "#'with spaces'",
+    "#\"quoted value\""
+  ],
+  "splitLexerCompoundWords": [
+    "nb-select"
+  ],
+  "editorPreviewCompounds": [
+    "critical-read",
+    "critical-write",
+    "transform-pipe"
+  ],
+  "fixtures": [
+    {
+      "id": "reserved-comparisons",
+      "source": "eq neq is",
+      "expected": [
+        {
+          "kind": "operator",
+          "value": "eq"
+        },
+        {
+          "kind": "operator",
+          "value": "neq"
+        },
+        {
+          "kind": "operator",
+          "value": "is"
+        }
+      ],
+      "evidence": "lexer-reserved"
+    },
+    {
+      "id": "legacy-lexer-words",
+      "source": "isoactor null",
+      "expected": [
+        {
+          "kind": "keyword",
+          "value": "isoactor"
+        },
+        {
+          "kind": "keyword",
+          "value": "null"
+        }
+      ],
+      "evidence": "lexer-reserved-only"
+    },
+    {
+      "id": "punctuation-tokenized",
+      "source": "a % b ^ c",
+      "expected": [
+        {
+          "kind": "operator",
+          "value": "%"
+        },
+        {
+          "kind": "operator",
+          "value": "^"
+        }
+      ],
+      "evidence": "lexer-tokenized-only"
+    },
+    {
+      "id": "hash-symbols",
+      "source": "return #ready #'with spaces' #\"quoted value\"",
+      "expected": [
+        {
+          "kind": "symbol",
+          "value": "#ready"
+        },
+        {
+          "kind": "symbol",
+          "value": "#'with spaces'"
+        },
+        {
+          "kind": "symbol",
+          "value": "#\"quoted value\""
+        }
+      ],
+      "evidence": "lexer-tokenized"
+    },
+    {
+      "id": "lexer-compound",
+      "source": "nb-select",
+      "expected": [
+        {
+          "kind": "keyword",
+          "value": "nb-select"
+        }
+      ],
+      "evidence": "lexer-split-NB-SELECT"
+    },
+    {
+      "id": "editor-preview-compounds",
+      "source": "critical-read critical-write transform-pipe",
+      "expected": [
+        {
+          "kind": "keyword",
+          "value": "critical-read"
+        },
+        {
+          "kind": "keyword",
+          "value": "critical-write"
+        },
+        {
+          "kind": "keyword",
+          "value": "transform-pipe"
+        }
+      ],
+      "evidence": "editor-preview-only"
+    },
+    {
+      "id": "execution-domain-and-panic",
+      "source": "panic cpu gpu",
+      "expected": [
+        {
+          "kind": "keyword",
+          "value": "panic"
+        },
+        {
+          "kind": "keyword",
+          "value": "cpu"
+        },
+        {
+          "kind": "keyword",
+          "value": "gpu"
+        }
+      ],
+      "evidence": "lexer-reserved-only"
+    },
+    {
+      "id": "four-runtime-controls",
+      "source": "recover defer throw raise",
+      "expected": [
+        {
+          "kind": "runtimeGlobal",
+          "value": "recover"
+        },
+        {
+          "kind": "runtimeGlobal",
+          "value": "defer"
+        },
+        {
+          "kind": "runtimeGlobal",
+          "value": "throw"
+        },
+        {
+          "kind": "runtimeGlobal",
+          "value": "raise"
+        }
+      ],
+      "evidence": "lexer-reserved-plus-editor-color-contract"
+    },
+    {
+      "id": "ownership-is-not-keyword",
+      "source": "const owned: int = 6",
+      "expected": [
+        {
+          "kind": "keyword",
+          "value": "const"
+        },
+        {
+          "kind": "plain",
+          "value": "owned"
+        }
+      ],
+      "evidence": "compiler-lexer-and-common-spec"
+    },
+    {
+      "id": "opaque-comments-strings",
+      "source": "/* outer /* return */ throw */ \"raise\" `defer` return",
+      "expected": [
+        {
+          "kind": "keyword",
+          "value": "return"
+        }
+      ],
+      "forbidden": [
+        {
+          "kind": "runtimeGlobal",
+          "value": "raise"
+        },
+        {
+          "kind": "runtimeGlobal",
+          "value": "throw"
+        },
+        {
+          "kind": "runtimeGlobal",
+          "value": "defer"
+        }
+      ],
+      "evidence": "lexer-literal-boundaries"
+    }
+  ]
+}
