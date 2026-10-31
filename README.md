@@ -135,7 +135,12 @@ The pinned compiler still recognizes `isoactor`, `null`, `%` and `^`;
 the forward-looking editor target does not. This is an unresolved semantic
 parity delta, not authority to change the compiler automatically.
 
-The Friday `grammar-drift` job compares Git blob hashes of two public
-compiler files to the pinned manifest and reports changes without
-downloading/executing compiler programs. Run
-`python scripts/check_upstream_syntax.py` for local validation.
+The shared suite now includes **50 adversarial editor fixtures**.
+
+**Privacy boundary:** The compiler source repository is private.
+Unauthenticated raw.githubusercontent.com requests cannot verify it.
+Public editor workflows must not clone, mirror, or fetch private sources.
+The scheduled watcher was removed; compiler-side lexer/parser proof is
+staged separately in private oreslang-source.java PR #2350 and currently
+has zero executed CI steps. Source-only grammar host tests are not evidence
+of actual Sublime engine behavior or Oreslang guest acceptance.

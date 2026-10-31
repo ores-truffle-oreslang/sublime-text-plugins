@@ -22,6 +22,7 @@ class SharedLexerConformance(unittest.TestCase):
         self.assertIn("null", CORPUS["profiles"]["compilerMainObservation"]["reserved"])
         self.assertIn("null", CORPUS["profiles"]["editorTarget"]["excludedReservedWords"])
         self.assertEqual(2, len(CORPUS["authority"]["files"]))
+        self.assertEqual(50, len(CORPUS["cases"]))
         self.assertEqual(len(CORPUS["cases"]),
                          len({case["id"] for case in CORPUS["cases"]}))
 
