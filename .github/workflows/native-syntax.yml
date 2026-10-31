@@ -1,0 +1,45 @@
+name: Sublime native syntax engine
+
+on:
+  pull_request:
+    paths:
+      - "Oreslang.sublime-syntax"
+      - "syntax_test_oreslang.ores"
+      - ".github/workflows/native-syntax.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Oreslang.sublime-syntax"
+      - "syntax_test_oreslang.ores"
+      - ".github/workflows/native-syntax.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  sublime-syntax:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact head and native syntax fixture
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git diff --quiet --exit-code
+          test -z "$(git ls-files --others --exclude-standard)"
+          test -s syntax_test_oreslang.ores
+          grep -F 'SYNTAX TEST "Packages/sublime-text-plugins/Oreslang.sublime-syntax"' syntax_test_oreslang.ores
+      - name: Execute native Sublime Text syntax tests (stable)
+        uses: SublimeText/syntax-test-action@872dccb36bdf23a020c4689422d22d8ff38da918
+        with:
+          build: stable
+          package_name: sublime-text-plugins
+          package_root: .
+          default_packages: "false"
