@@ -794,5 +794,5 @@
       "symbols": []
     }
   ],
-  "evidenceBoundary": "50 proposed editor-target lexical fixtures. Not the private compiler's authoritative lexer, parser, typechecker, native guest, or actual editor rendering. Private compiler evidence must remain in its original repository."
+  "evidenceBoundary": "This proposed 50-case editor-target highlighting suite does not establish acceptance by the private compiler, parser, typechecker, runtime, native guest, or actual editor engine."
 }
