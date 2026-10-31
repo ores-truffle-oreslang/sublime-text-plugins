@@ -55,3 +55,10 @@ for(const fixture of manifest.fixtures) {
     }
   });
 }
+
+test('all 93 compiler lexer-reserved words have a grammar recognition rule',()=>{
+  for(const word of manifest.reservedWords) {
+    const recognized=keywords.test(word)||globals.test(word)||comparisons.test(word);
+    assert.ok(recognized,'missing pinned Java lexer token: '+word);
+  }
+});
