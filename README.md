@@ -120,3 +120,22 @@ hex colors, JSON resources, and diagnostic parser formats.
 ### Compiler compatibility
 
 The editor grammar tracks proposed compiler constructs without changing compiler acceptance. See [docs/compiler-pr-sync.md](docs/compiler-pr-sync.md) for the October 2026 upstream PR matrix and validation gates.
+
+## Cross-editor syntax fixtures and grammar drift
+
+`conformance/oreslang-syntax-v1.json` is the byte-identical lexical fixture
+manifest copied to the VS Code and HTML highlighter repositories.
+`tests/test_conformance.py` checks keywords, exclusions, hash Symbols,
+compound keywords, grammar precedence, and removed operator scopes using
+standard-library Python. It cannot run Sublime's actual syntax engine,
+and must not be reported as editor UI testing or guest compilation.
+
+The fixture pins concrete blob hashes from the Java lexer and EBNF.
+The pinned compiler still recognizes `isoactor`, `null`, `%` and `^`;
+the forward-looking editor target does not. This is an unresolved semantic
+parity delta, not authority to change the compiler automatically.
+
+The Friday `grammar-drift` job compares Git blob hashes of two public
+compiler files to the pinned manifest and reports changes without
+downloading/executing compiler programs. Run
+`python scripts/check_upstream_syntax.py` for local validation.
