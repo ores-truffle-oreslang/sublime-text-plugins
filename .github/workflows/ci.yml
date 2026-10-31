@@ -26,3 +26,19 @@ jobs:
       - name: Validate compiler source pins offline
         run: python scripts/check_upstream_syntax.py
 
+
+  sublime-syntax-engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Execute native Sublime syntax assertions with real engine
+        uses: SublimeText/syntax-test-action@872dccb36bdf23a020c4689422d22d8ff38da918 # v2.5.1
+        with:
+          build: stable
+          package_name: Oreslang
+          package_root: .

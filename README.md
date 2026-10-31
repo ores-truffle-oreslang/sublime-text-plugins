@@ -148,3 +148,7 @@ of actual Sublime engine behavior or Oreslang guest acceptance.
 ## Sublime native syntax test fixture
 
 Install the package as `Packages/Oreslang`, open `syntax_test_oreslang.ores` in Sublime Text, and invoke **Tools → Build** to run Sublime's native Syntax Tests. The fixture contains scope assertions for opaque comments, templates, Symbols, compound keywords and contextual comparisons. CI presently checks only fixture integrity; **no real Sublime Text binary executed this fixture in GitHub Actions**.
+
+### Real Sublime syntax engine CI
+
+The `sublime-syntax-engine` job uses the pinned `SublimeText/syntax-test-action` v2.5.1 implementation with a stable Sublime syntax test binary and `package_name: Oreslang`. Unlike Python fixture-inventory tests, this job executes the `syntax_test_oreslang.ores` scope selectors using the native Sublime syntax engine. Treat it as proven only after the dedicated job reports nonzero executed steps and a successful result.
