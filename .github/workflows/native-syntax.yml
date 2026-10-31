@@ -36,10 +36,10 @@ jobs:
           test -z "$(git ls-files --others --exclude-standard)"
           test -s syntax_test_oreslang.ores
           grep -F 'SYNTAX TEST "Packages/sublime-text-plugins/Oreslang.sublime-syntax"' syntax_test_oreslang.ores
-      - name: Execute native Sublime Text syntax tests (stable)
+      - name: Execute native Sublime Text syntax tests (pinned build 4215)
         uses: SublimeText/syntax-test-action@872dccb36bdf23a020c4689422d22d8ff38da918
         with:
-          build: stable
+          build: '4215'
           package_name: sublime-text-plugins
           package_root: .
           default_packages: "false"
