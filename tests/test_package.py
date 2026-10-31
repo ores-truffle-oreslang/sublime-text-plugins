@@ -77,9 +77,12 @@ class PackageContractTest(unittest.TestCase):
         self.assertIn("critical", syntax)
         self.assertIn("suspends", syntax)
         self.assertIn("string.quoted.template.oreslang", syntax)
-        self.assertNotIn("isoactor", syntax)
-        self.assertNotIn("null|", syntax)
-        self.assertNotIn("\\\\^\\\\^", syntax)
+        # Lexer recognition is not parser acceptance or deprecation proof.
+        self.assertIn("isoactor", syntax)
+        self.assertIn("null|", syntax)
+        self.assertIn("panic", syntax)
+        self.assertIn("cpu|gpu", syntax)
+        self.assertIn("%=&|^", syntax)
 
     def test_plugin_python_compiles(self):
         source = (ROOT / "oreslang.py").read_text()
