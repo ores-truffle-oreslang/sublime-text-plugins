@@ -25,6 +25,6 @@ jobs:
         with:
           node-version: "22.20.0"
       - name: Validate pinned editor lexical contract v1
-        run: node --test tests/editor-lexical-contract.test.cjs
+        run: node --test tests/*.test.cjs
       - name: Compile plugin Python
         run: python -m py_compile oreslang.py
