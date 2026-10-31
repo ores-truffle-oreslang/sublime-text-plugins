@@ -16,6 +16,8 @@ test('Sublime grammar scopes exact valid Symbol literal boundaries',()=>{
   for(const value of [
     '#ready', "#'with spaces'", '#"quoted value"',
     String.raw`#"\u0061"`,
+    String.raw`#"\uD83D\uDE00"`,
+    String.raw`#'\uD83D\uDE00'`,
     String.raw`#"escaped \" quote"`,
     '#'+ 'a'.repeat(128)
   ]) assert.equal(regex.test(value),true,value);
@@ -28,6 +30,10 @@ test('Sublime grammar refuses invalid and overlong Symbol tokens',()=>{
     String.raw`#"bad\q"`,
     String.raw`#"bad\n"`,
     String.raw`#"bad\uZZZZ"`,
+    String.raw`#"\uD800"`,
+    String.raw`#"\uDE00"`,
+    String.raw`#"\uDE00\uD83D"`,
+    String.raw`#"\uD83D\u0061"`,
     '#"raw\nnewline"', "#'raw\rnewline'",
     '#"unterminated'
   ]) assert.equal(regex.test(value),false,value);
