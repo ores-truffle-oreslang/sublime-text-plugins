@@ -92,3 +92,18 @@ gpuα
 //  ^ source.oreslang - keyword.oreslang
 return
 // <- source.oreslang keyword.oreslang
+
+// The native compiler accepts paired UTF-16 Symbol escapes, but never lone
+// high/low surrogates. The syntax engine must not imply those are valid.
+#"\uD83D\uDE00"
+// <- source.oreslang constant.other.symbol.oreslang
+#'\uD83D\uDE00'
+// <- source.oreslang constant.other.symbol.oreslang
+#"\uD800"
+// <- source.oreslang - constant.other.symbol.oreslang
+#"\uDE00"
+// <- source.oreslang - constant.other.symbol.oreslang
+#"\uDE00\uD83D"
+// <- source.oreslang - constant.other.symbol.oreslang
+#"\uD83D\u0061"
+// <- source.oreslang - constant.other.symbol.oreslang
