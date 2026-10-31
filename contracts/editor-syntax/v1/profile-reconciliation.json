@@ -54,7 +54,20 @@
     "allowedToSwitch": "Only after private compiler PR #2350 executes exact-head tests and semantic differences are independently reviewed",
     "preserveCompilerLexerSnapshot": true,
     "explicitlyNotEquivalent": true,
-    "previewArtifactOnly": true
+    "previewArtifactOnly": true,
+    "previewArtifactsByRepository": {
+      "vscode-plugins": [
+        "lib/scan-target-preview.js",
+        "syntaxes/oreslang-target-preview.tmLanguage.json"
+      ],
+      "sublime-text-plugins": [
+        "Preview.sublime-syntax",
+        "syntax_test_oreslang.ores"
+      ],
+      "html-js-css-syntax-highlighter": [
+        "src/plugins/oreslang-target-preview.js"
+      ]
+    }
   },
   "differenceIds": [
     "eq-neq-is",
@@ -64,5 +77,5 @@
     "caret",
     "double-caret"
   ],
-  "notes": "No profile in this file is a claim of successful private compiler JUnit or guest execution. Do not silently treat the editor-target preview as current compiler behavior. The installed .ores grammar stays compiler-current; Preview.sublime-syntax is an opt-in test-only preview of unverified target semantics."
+  "notes": "Two distinct pinned lexical profiles: the default editor grammar follows the current private compiler lexer snapshot, while the language-target grammar is an unregistered, test-only preview. This is not proof of executed private compiler JUnit or guest acceptance. Do not activate the preview as the default or merge without an independently reviewed language decision."
 }
