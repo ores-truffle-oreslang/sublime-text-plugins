@@ -74,3 +74,21 @@ return
 // <- source.oreslang string.quoted.double.oreslang - support.function.global.oreslang
 `raise #ready`
 // <- source.oreslang string.quoted.template.oreslang - constant.other.symbol.oreslang
+
+// BMP Unicode letters share identifier boundaries with Java Lexer.
+returné
+// <- source.oreslang - keyword.oreslang
+eq中
+// <- source.oreslang - keyword.operator.comparison.oreslang
+panicπ
+// <- source.oreslang - keyword.oreslang
+gpuα
+// <- source.oreslang - keyword.oreslang
+éreturn
+//  ^ source.oreslang - keyword.oreslang
+中eq
+//  ^ source.oreslang - keyword.operator.comparison.oreslang
+πpanic
+//  ^ source.oreslang - keyword.oreslang
+return
+// <- source.oreslang keyword.oreslang
