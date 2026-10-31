@@ -1,0 +1,24 @@
+// SYNTAX TEST "Packages/Oreslang/Oreslang.sublime-syntax"
+isoactor null panic cpu gpu
+// <- keyword.oreslang
+//       ^^^ keyword.oreslang
+//            ^^^ keyword.oreslang
+//                  ^^^ keyword.oreslang
+//                      ^^^ keyword.oreslang
+let eq = 1; value is other; let neq = 2;
+// <- keyword.oreslang
+//  ^^ keyword.operator.comparison.oreslang
+//                ^^ keyword.operator.comparison.oreslang
+//                              ^^^ keyword.operator.comparison.oreslang
+a % b ^ c;
+//^ keyword.operator.oreslang
+//    ^ keyword.operator.oreslang
+/* outer /* return */ recover */ pub fnc ok() {}
+//          ^^^ comment.block.oreslang - keyword.oreslang
+//                    ^^^ comment.block.oreslang - support.function.global.oreslang
+//                               ^^^ keyword.oreslang
+//                                   ^^^ keyword.oreslang
+const x = "if recover"; defer;
+//         ^^ string.quoted.double.oreslang - keyword.oreslang
+//            ^^^ string.quoted.double.oreslang - support.function.global.oreslang
+//                      ^^^ support.function.global.oreslang
