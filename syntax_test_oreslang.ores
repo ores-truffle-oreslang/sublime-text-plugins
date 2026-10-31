@@ -1,0 +1,41 @@
+// SYNTAX TEST "Packages/Oreslang/Oreslang.sublime-syntax"
+pub fnc run() { return; }
+// <- keyword.oreslang
+//  ^^^ keyword.oreslang
+//      ^^^ entity.name.function.oreslang
+//              ^^^ keyword.oreslang
+/* outer /* return */ recover */ pub fnc ok() {}
+//          ^^^ comment.block.oreslang - keyword.oreslang
+//                    ^^^ comment.block.oreslang - support.function.global.oreslang
+//                               ^^^ keyword.oreslang
+//                                   ^^^ keyword.oreslang
+const s = "if recover"; defer;
+// <- keyword.oreslang
+//         ^^ string.quoted.double.oreslang - keyword.oreslang
+//            ^^^ string.quoted.double.oreslang - support.function.global.oreslang
+//                      ^^^ support.function.global.oreslang
+const t = `if actor`; return;
+//         ^^ string.quoted.template.oreslang - keyword.oreslang
+//            ^^^ string.quoted.template.oreslang - keyword.oreslang
+//                    ^^^ keyword.oreslang
+nb-select critical-read critical-write transform-pipe
+// <- keyword.oreslang
+//        ^^^ keyword.oreslang
+//                      ^^^ keyword.oreslang
+//                                     ^^^ keyword.oreslang
+const a = #ready; const b = #'two words';
+//        ^^^ constant.other.symbol.oreslang
+//                          ^^^ constant.other.symbol.oreslang
+let eq = 1; left eq right;
+//  ^^ source.oreslang - keyword.operator.comparison.oreslang
+//               ^^ keyword.operator.comparison.oreslang
+define isolated actor Worker as end
+// <- keyword.oreslang
+//     ^^^ keyword.oreslang
+//              ^^^ keyword.oreslang
+//                              ^^^ keyword.oreslang
+null isoactor % ^
+// <- source.oreslang - keyword.oreslang
+//   ^^^ source.oreslang - keyword.oreslang
+//            ^ source.oreslang - keyword.operator.oreslang
+//              ^ source.oreslang - keyword.operator.oreslang

@@ -144,3 +144,7 @@ The scheduled watcher was removed; compiler-side lexer/parser proof is
 staged separately in private oreslang-source.java PR #2350 and currently
 has zero executed CI steps. Source-only grammar host tests are not evidence
 of actual Sublime engine behavior or Oreslang guest acceptance.
+
+## Sublime native syntax test fixture
+
+Install the package as `Packages/Oreslang`, open `syntax_test_oreslang.ores` in Sublime Text, and invoke **Tools → Build** to run Sublime's native Syntax Tests. The fixture contains scope assertions for opaque comments, templates, Symbols, compound keywords and contextual comparisons. CI presently checks only fixture integrity; **no real Sublime Text binary executed this fixture in GitHub Actions**.
