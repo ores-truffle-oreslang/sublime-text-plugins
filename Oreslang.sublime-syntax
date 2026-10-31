@@ -37,7 +37,7 @@ contexts:
       scope: keyword.oreslang
 
     # Comparison words are contextual, not reserved identifiers.
-    - match: '(?<=[A-Za-z0-9_\\)\\]})]\\s+\\b(?:eq|neq|is)\\b(?=\\s+(?:[A-Za-z_][A-Za-z0-9_]*|[0-9]))'
+    - match: '\b(?:eq|neq|is)\b(?=\s+(?:[A-Za-z_][A-Za-z0-9_]*|[0-9]|\())'
       scope: keyword.operator.comparison.oreslang
 
     - match: '@{{identifier}}'
@@ -52,7 +52,7 @@ contexts:
     - match: '\b({{identifier}})(?=\s*\()'
       scope: variable.function.oreslang
 
-    - match: '=>|->|==|!=|<=|>=|<<|>>>|>>|&&|\|\||\^\^|[+\-*/=&|~!<>?:]'
+    - match: '=>|->|==|!=|<=|>=|<<|>>>|>>|&&|\|\||[+\-*/=&|~!<>?:]'
       scope: keyword.operator.oreslang
 
     - match: '[{}\[\]()]'
