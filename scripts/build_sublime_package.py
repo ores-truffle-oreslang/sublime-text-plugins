@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""Build the release-only Oreslang.sublime-package from a fixed allowlist."""
+from __future__ import annotations
+import argparse
+import hashlib
+from pathlib import Path
+import zipfile
+
+ROOT = Path(__file__).resolve().parents[1]
+FILES = (
+    "Default.sublime-commands",
+    "Main.sublime-menu",
+    "Oreslang.sublime-build",
+    "Oreslang.sublime-settings",
+    "Oreslang.sublime-syntax",
+    "oreslang.py",
+)
+ARCHIVE_NAME = "Oreslang.sublime-package"
+
+def build(dest: Path) -> str:
+    if dest.resolve().is_relative_to(ROOT) and dest.name in FILES:
+        raise ValueError("archive cannot replace a source file")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if len(FILES) != len(set(FILES)):
+        raise ValueError("duplicate package paths")
+    with zipfile.ZipFile(dest, "w", compression=zipfile.ZIP_DEFLATED,
+                         compresslevel=9, strict_timestamps=True) as archive:
+        for name in sorted(FILES):
+            source = ROOT / name
+            if not source.is_file() or source.is_symlink():
+                raise ValueError(f"missing or symlinked required release file: {name}")
+            entry = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
+            entry.create_system = 3
+            entry.external_attr = 0o100644 << 16
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(entry, source.read_bytes(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
+    verify(dest)
+    sha = hashlib.sha256(dest.read_bytes()).hexdigest()
+    return sha
+
+def verify(dest: Path) -> None:
+    with zipfile.ZipFile(dest) as archive:
+        names = archive.namelist()
+        if names != sorted(FILES):
+            raise ValueError("release archive contains unexpected, missing or duplicate files")
+        for entry in archive.infolist():
+            if entry.date_time != (1980, 1, 1, 0, 0, 0):
+                raise ValueError("nonreproducible archive timestamp")
+            if entry.create_system != 3 or (entry.external_attr >> 16) != 0o100644:
+                raise ValueError("nonportable archive file mode")
+            if archive.read(entry.filename) != (ROOT / entry.filename).read_bytes():
+                raise ValueError("archive differs from source")
+        if b"source.oreslang" not in archive.read("Oreslang.sublime-syntax"):
+            raise ValueError("installed compiler-current grammar missing")
+        for forbidden in ("Preview.sublime-syntax", "conformance/", "contracts/",
+                          "tests/", "syntax_test_", "foo.ores", ".github/"):
+            if any(name.startswith(forbidden) for name in names):
+                raise ValueError("preview/test/private source included")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", type=Path, default=Path("dist") / ARCHIVE_NAME)
+    args = parser.parse_args()
+    digest = build(args.output)
+    print(f"SHA256 {digest} {args.output}")
