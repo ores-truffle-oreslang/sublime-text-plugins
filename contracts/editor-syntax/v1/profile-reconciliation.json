@@ -49,11 +49,12 @@
     }
   },
   "resolution": {
-    "activeStackedEditorProfile": "language-target",
+    "activeStackedEditorProfile": "compiler-current",
     "mergeGate": "BLOCKED_COMPILER_PARITY",
     "allowedToSwitch": "Only after private compiler PR #2350 executes exact-head tests and semantic differences are independently reviewed",
     "preserveCompilerLexerSnapshot": true,
-    "explicitlyNotEquivalent": true
+    "explicitlyNotEquivalent": true,
+    "previewArtifactOnly": true
   },
   "differenceIds": [
     "eq-neq-is",
@@ -63,5 +64,5 @@
     "caret",
     "double-caret"
   ],
-  "notes": "No profile in this file is a claim of successful private compiler JUnit or guest execution. Do not silently treat the editor-target preview as current compiler behavior."
+  "notes": "No profile in this file is a claim of successful private compiler JUnit or guest execution. Do not silently treat the editor-target preview as current compiler behavior. The installed .ores grammar stays compiler-current; Preview.sublime-syntax is an opt-in test-only preview of unverified target semantics."
 }

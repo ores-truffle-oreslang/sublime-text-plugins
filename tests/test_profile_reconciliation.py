@@ -19,7 +19,7 @@ class ExplicitLexicalProfiles(unittest.TestCase):
         bridge=json.loads(BRIDGE.read_text(encoding="utf-8"))
         self.assertEqual(bridge["schema"],"oreslang.editor-syntax-profile-reconciliation/v1")
         self.assertEqual(bridge["resolution"]["mergeGate"],"BLOCKED_COMPILER_PARITY")
-        self.assertEqual(bridge["resolution"]["activeStackedEditorProfile"],"language-target")
+        self.assertEqual(bridge["resolution"]["activeStackedEditorProfile"],"compiler-current")
         self.assertTrue(bridge["resolution"]["explicitlyNotEquivalent"])
         self.assertEqual(git_blob(CURRENT),bridge["profiles"]["compiler-current"]["gitBlobSha"])
         self.assertEqual(git_blob(TARGET),bridge["profiles"]["language-target"]["gitBlobSha"])

@@ -152,3 +152,7 @@ Install the package as `Packages/Oreslang`, open `syntax_test_oreslang.ores` in 
 ### Real Sublime syntax engine CI
 
 The `sublime-syntax-engine` job uses the pinned `SublimeText/syntax-test-action` v2.5.1 implementation with a stable Sublime syntax test binary and `package_name: Oreslang`. Unlike Python fixture-inventory tests, this job executes the `syntax_test_oreslang.ores` scope selectors using the native Sublime syntax engine. Treat it as proven only after the dedicated job reports nonzero executed steps and a successful result.
+
+## Explicit compiler-current default and language-target preview
+
+`Oreslang.sublime-syntax` remains the current compiler-lexer compatibility grammar. `Preview.sublime-syntax` is a distinct **test-only** proposal (file extension `.ores-target-preview`), and the native `syntax_test_oreslang.ores` now selects it explicitly so its contextual-operator and deprecated-token expectations cannot silently override regular `.ores` syntax. The two profiles are pinned in `contracts/editor-syntax/v1/profile-reconciliation.json`; compiler JUnit/guest evidence is still unavailable and independent review remains required.

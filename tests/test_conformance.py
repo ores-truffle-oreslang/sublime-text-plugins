@@ -5,7 +5,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 CORPUS = json.loads((ROOT / "conformance" / "oreslang-syntax-v1.json").read_text(encoding="utf-8"))
-SYNTAX = (ROOT / "Oreslang.sublime-syntax").read_text(encoding="utf-8")
+SYNTAX = (ROOT / "Preview.sublime-syntax").read_text(encoding="utf-8")
 
 
 def yaml_single_quoted_variable(key):

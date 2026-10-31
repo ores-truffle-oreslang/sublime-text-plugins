@@ -1,4 +1,4 @@
-// SYNTAX TEST "Packages/Oreslang/Oreslang.sublime-syntax"
+// SYNTAX TEST "Packages/Oreslang/Preview.sublime-syntax"
 pub fnc run() { return; }
 // <- keyword.oreslang
 //  ^^^ keyword.oreslang
