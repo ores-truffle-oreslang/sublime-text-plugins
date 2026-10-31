@@ -39,7 +39,7 @@ class SharedLexerConformance(unittest.TestCase):
                     # remains a *reserved spelling* outside that region. Only
                     # full editor tokenization (not this regex source test) can
                     # prove the region is masked. Keep those checks separate.
-                    if fixture["id"] in {
+                    if fixture.get("opaque", False) or fixture["id"] in {
                             "nested-comments", "quoted-string",
                             "template-body", "unicode-string"}:
                         self.assertIn(word, fixture["source"])

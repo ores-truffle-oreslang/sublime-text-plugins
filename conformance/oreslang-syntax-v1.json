@@ -248,7 +248,551 @@
       "globals": [],
       "notGlobals": [],
       "symbols": []
+    },
+    {
+      "id": "control-if-else",
+      "source": "if true { return; } else { return; }",
+      "keywords": [
+        "if",
+        "return",
+        "else"
+      ],
+      "notKeywords": [],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "control-while",
+      "source": "while true { break; }",
+      "keywords": [
+        "while",
+        "break"
+      ],
+      "notKeywords": [],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "actor-spawn",
+      "source": "spawn Worker();",
+      "keywords": [
+        "spawn"
+      ],
+      "notKeywords": [
+        "Worker"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "typed-import",
+      "source": "import actor Worker from \"pkg\";",
+      "keywords": [
+        "import",
+        "actor",
+        "from"
+      ],
+      "notKeywords": [
+        "Worker"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "namespace-decl",
+      "source": "namespace Store;",
+      "keywords": [
+        "namespace"
+      ],
+      "notKeywords": [
+        "Store"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "try-catch-recover",
+      "source": "try { throw; } catch (error) { recover; }",
+      "keywords": [
+        "try",
+        "catch"
+      ],
+      "notKeywords": [],
+      "globals": [
+        "throw",
+        "recover"
+      ],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "async-await",
+      "source": "async fnc fetch() { await task; }",
+      "keywords": [
+        "async",
+        "fnc",
+        "await"
+      ],
+      "notKeywords": [
+        "fetch",
+        "task"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "select-write",
+      "source": "do select { case writech out, 1: return; }",
+      "keywords": [
+        "do",
+        "select",
+        "writech",
+        "return"
+      ],
+      "notKeywords": [
+        "out"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "critical-suspends",
+      "source": "critical suspends fnc flush() { return; }",
+      "keywords": [
+        "critical",
+        "suspends",
+        "fnc",
+        "return"
+      ],
+      "notKeywords": [
+        "flush"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "generator-yield",
+      "source": "gen fnc items() { yield 1; }",
+      "keywords": [
+        "gen",
+        "fnc",
+        "yield"
+      ],
+      "notKeywords": [
+        "items"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "tuple-const",
+      "source": "const pair = (1, 2);",
+      "keywords": [
+        "const"
+      ],
+      "notKeywords": [
+        "pair"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "record-literal",
+      "source": "const user = { id: 1, name: \"Ada\" };",
+      "keywords": [
+        "const"
+      ],
+      "notKeywords": [
+        "user",
+        "name"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "escaped-double-string",
+      "source": "const s = \"if \\\"return\\\" else\";",
+      "keywords": [
+        "const"
+      ],
+      "notKeywords": [
+        "if",
+        "return",
+        "else"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": [],
+      "opaque": true
+    },
+    {
+      "id": "single-quoted-string",
+      "source": "const s = 'recover throw';",
+      "keywords": [
+        "const"
+      ],
+      "notKeywords": [],
+      "globals": [],
+      "notGlobals": [
+        "recover",
+        "throw"
+      ],
+      "symbols": [],
+      "opaque": true
+    },
+    {
+      "id": "second-nested-comment",
+      "source": "/*if/*match*/catch*/ fnc ok() {}",
+      "keywords": [
+        "fnc"
+      ],
+      "notKeywords": [
+        "if",
+        "match",
+        "catch"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": [],
+      "opaque": true
+    },
+    {
+      "id": "single-quoted-hash-symbol",
+      "source": "const x = #'when // if';",
+      "keywords": [
+        "const"
+      ],
+      "notKeywords": [],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": [
+        "#'when // if'"
+      ]
+    },
+    {
+      "id": "double-quoted-hash-symbol",
+      "source": "const x = #\"actor 1\";",
+      "keywords": [
+        "const"
+      ],
+      "notKeywords": [],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": [
+        "#\"actor 1\""
+      ]
+    },
+    {
+      "id": "escaped-hash-symbol",
+      "source": "const x = #\"quo\\\"ted\";",
+      "keywords": [
+        "const"
+      ],
+      "notKeywords": [],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": [
+        "#\"quo\\\"ted\""
+      ]
+    },
+    {
+      "id": "contextual-is",
+      "source": "a is b;",
+      "keywords": [],
+      "notKeywords": [
+        "is"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "contextual-neq",
+      "source": "a neq b;",
+      "keywords": [],
+      "notKeywords": [
+        "neq"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "contextual-eq",
+      "source": "a eq b;",
+      "keywords": [],
+      "notKeywords": [
+        "eq"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "keyword-line-comment",
+      "source": "// critical fnc recover\nreturn;",
+      "keywords": [
+        "return"
+      ],
+      "notKeywords": [
+        "critical",
+        "fnc"
+      ],
+      "globals": [],
+      "notGlobals": [
+        "recover"
+      ],
+      "symbols": [],
+      "opaque": true
+    },
+    {
+      "id": "opaque-template-controls",
+      "source": "const tpl = `fnc actor defer`; return;",
+      "keywords": [
+        "const",
+        "return"
+      ],
+      "notKeywords": [
+        "fnc",
+        "actor"
+      ],
+      "globals": [],
+      "notGlobals": [
+        "defer"
+      ],
+      "symbols": [],
+      "opaque": true
+    },
+    {
+      "id": "two-block-comments",
+      "source": "/* one */\n/* two */\nconst a = 3;",
+      "keywords": [
+        "const"
+      ],
+      "notKeywords": [],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "boolean-bindings",
+      "source": "const enabled = true; const disabled = false;",
+      "keywords": [
+        "const"
+      ],
+      "notKeywords": [
+        "enabled",
+        "disabled"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "callable-params",
+      "source": "fnc add(a:int,b:int) { return a + b; }",
+      "keywords": [
+        "fnc",
+        "return"
+      ],
+      "notKeywords": [
+        "add"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "function-annotation",
+      "source": "@DefaultArgVals fnc f() { return; }",
+      "keywords": [
+        "fnc",
+        "return"
+      ],
+      "notKeywords": [
+        "DefaultArgVals"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "untrusted-actor-decl",
+      "source": "define untrusted actor Guest as end",
+      "keywords": [
+        "define",
+        "untrusted",
+        "actor",
+        "end"
+      ],
+      "notKeywords": [
+        "Guest"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "shared-actor-decl",
+      "source": "define shared actor Pool as end",
+      "keywords": [
+        "define",
+        "shared",
+        "actor",
+        "end"
+      ],
+      "notKeywords": [
+        "Pool"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "isolated-actor-decl",
+      "source": "define isolated actor Isolate as end",
+      "keywords": [
+        "define",
+        "isolated",
+        "actor",
+        "end"
+      ],
+      "notKeywords": [
+        "Isolate"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "module-decl",
+      "source": "define module App as end",
+      "keywords": [
+        "define",
+        "module",
+        "end"
+      ],
+      "notKeywords": [
+        "App"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "interface-decl",
+      "source": "define interface Service as end",
+      "keywords": [
+        "define",
+        "interface",
+        "end"
+      ],
+      "notKeywords": [
+        "Service"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "struct-decl",
+      "source": "define struct Pair as end",
+      "keywords": [
+        "define",
+        "struct",
+        "end"
+      ],
+      "notKeywords": [
+        "Pair"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "type-alias",
+      "source": "type Alias = int;",
+      "keywords": [
+        "type"
+      ],
+      "notKeywords": [
+        "Alias"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "symbol-unquoted",
+      "source": "const s = #state;",
+      "keywords": [
+        "const"
+      ],
+      "notKeywords": [],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": [
+        "#state"
+      ]
+    },
+    {
+      "id": "emoji-string-opaque",
+      "source": "const t = \"🙂 actor\";",
+      "keywords": [
+        "const"
+      ],
+      "notKeywords": [
+        "actor"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": [],
+      "opaque": true
+    },
+    {
+      "id": "critical-read-compound",
+      "source": "critical-read",
+      "keywords": [
+        "critical-read"
+      ],
+      "notKeywords": [],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "critical-write-compound",
+      "source": "critical-write",
+      "keywords": [
+        "critical-write"
+      ],
+      "notKeywords": [],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "transform-pipe-compound",
+      "source": "transform-pipe",
+      "keywords": [
+        "transform-pipe"
+      ],
+      "notKeywords": [],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
     }
   ],
-  "evidenceBoundary": "This fixture covers host-level lexical/highlighting contracts. It does not establish validity, compiler conformance, native guest execution or actual editor-rendering correctness."
+  "evidenceBoundary": "50 proposed editor-target lexical fixtures. Not the private compiler's authoritative lexer, parser, typechecker, native guest, or actual editor rendering. Private compiler evidence must remain in its original repository."
 }
