@@ -1,0 +1,254 @@
+{
+  "schema": "oreslang.editor-syntax-conformance/v1",
+  "version": 1,
+  "authority": {
+    "repo": "ores-truffle-oreslang/oreslang-source.java",
+    "commit": "241bd67c39443cc2ef18df7e4ed456454af378c7",
+    "files": [
+      {
+        "path": "src/main/java/dev/oreslang/parser/Lexer.java",
+        "gitBlobSha": "bba9e091c0ad1c9b75e0c61e9dd173fcc18a236a"
+      },
+      {
+        "path": "docs/grammar.ebnf",
+        "gitBlobSha": "7ecfe82817945a1972cf9ac47df3466efab1822b"
+      }
+    ]
+  },
+  "profiles": {
+    "compilerMainObservation": {
+      "status": "observed, not declared correct for pending design",
+      "reserved": [
+        "isoactor",
+        "null",
+        "is",
+        "eq",
+        "neq",
+        "suspends"
+      ],
+      "punctuators": [
+        "%",
+        "^"
+      ],
+      "notes": "The pinned compiler lexer still recognizes isoactor/null/%/^; its parser has context-specific rules. No editor fixture is proof of compilation."
+    },
+    "editorTarget": {
+      "status": "proposed Oreslang design; requires compiler parity",
+      "keywordSamples": [
+        "define",
+        "pub",
+        "isolated",
+        "actor",
+        "critical",
+        "suspends",
+        "fnc",
+        "return",
+        "end",
+        "nb",
+        "select",
+        "readch"
+      ],
+      "runtimeGlobals": [
+        "recover",
+        "defer",
+        "throw",
+        "raise"
+      ],
+      "compoundForms": [
+        "critical-read",
+        "critical-write",
+        "nb-select",
+        "transform-pipe"
+      ],
+      "contextualIdentifierWords": [
+        "eq",
+        "neq",
+        "is"
+      ],
+      "excludedReservedWords": [
+        "isoactor",
+        "null"
+      ],
+      "excludedArithmeticOperators": [
+        "%",
+        "^",
+        "^^"
+      ]
+    }
+  },
+  "cases": [
+    {
+      "id": "actor-critical",
+      "source": "define pub isolated actor Worker as\n  state count: int\n  critical suspends fnc update() { return; }\nend",
+      "keywords": [
+        "define",
+        "pub",
+        "isolated",
+        "actor",
+        "critical",
+        "suspends",
+        "fnc",
+        "return",
+        "end"
+      ],
+      "notKeywords": [
+        "state",
+        "handle_state",
+        "Worker",
+        "count"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "channel-select",
+      "source": "nb select first { case readch events: return; }",
+      "keywords": [
+        "nb",
+        "select",
+        "readch",
+        "return"
+      ],
+      "notKeywords": [
+        "events"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "nested-comments",
+      "source": "/* outer /* return */ recover */ pub fnc run() {}",
+      "keywords": [
+        "pub",
+        "fnc"
+      ],
+      "notKeywords": [
+        "return"
+      ],
+      "globals": [],
+      "notGlobals": [
+        "recover"
+      ],
+      "symbols": []
+    },
+    {
+      "id": "quoted-string",
+      "source": "const label = \"if recover\"; return;",
+      "keywords": [
+        "const",
+        "return"
+      ],
+      "notKeywords": [
+        "if"
+      ],
+      "globals": [],
+      "notGlobals": [
+        "recover"
+      ],
+      "symbols": []
+    },
+    {
+      "id": "template-body",
+      "source": "const label = `if (recover) { return; }`; return;",
+      "keywords": [
+        "const",
+        "return"
+      ],
+      "notKeywords": [
+        "if"
+      ],
+      "globals": [],
+      "notGlobals": [
+        "recover"
+      ],
+      "symbols": []
+    },
+    {
+      "id": "global-controls",
+      "source": "defer; recover; throw; raise;",
+      "keywords": [],
+      "notKeywords": [],
+      "globals": [
+        "defer",
+        "recover",
+        "throw",
+        "raise"
+      ],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "compound-forms",
+      "source": "critical-read critical-write nb-select transform-pipe",
+      "keywords": [
+        "critical-read",
+        "critical-write",
+        "nb-select",
+        "transform-pipe"
+      ],
+      "notKeywords": [],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "contextual-bindings",
+      "source": "let eq = 1; let neq = 2; let is = 3;",
+      "keywords": [
+        "let"
+      ],
+      "notKeywords": [
+        "eq",
+        "neq",
+        "is"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "hash-symbols",
+      "source": "const a = #ready; const b = #'two words';",
+      "keywords": [
+        "const"
+      ],
+      "notKeywords": [],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": [
+        "#ready",
+        "#'two words'"
+      ]
+    },
+    {
+      "id": "unicode-string",
+      "source": "const café = \"🙂 return\"; pub fnc ok() {}",
+      "keywords": [
+        "const",
+        "pub",
+        "fnc"
+      ],
+      "notKeywords": [
+        "return"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    },
+    {
+      "id": "removed-forms",
+      "source": "null isoactor % ^ ^^",
+      "keywords": [],
+      "notKeywords": [
+        "null",
+        "isoactor"
+      ],
+      "globals": [],
+      "notGlobals": [],
+      "symbols": []
+    }
+  ],
+  "evidenceBoundary": "This fixture covers host-level lexical/highlighting contracts. It does not establish validity, compiler conformance, native guest execution or actual editor-rendering correctness."
+}
