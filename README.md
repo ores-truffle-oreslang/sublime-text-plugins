@@ -80,7 +80,7 @@ annotations:
 
 The canonical `oreslang` CLI protocol v1 JSON is preferred; plain compiler-style diagnostics remain a compatibility fallback.
 
-By default diagnostics run after save. To enable debounced checks while typing,
+For safety, compiler subprocesses do not run automatically by default: Sublime Text does not provide a VS Code-style workspace trust gate. Use **Oreslang: Check File** manually, or explicitly enable checks after saving a trusted project. To opt into save-time and debounced checks,
 customize `Oreslang.sublime-settings`:
 
 ```json
@@ -92,7 +92,7 @@ customize `Oreslang.sublime-settings`:
 }
 ```
 
-The CLI command is an argument array, not a shell command. Supported
+The CLI command is an argument array, not a shell command. Compiler results are discarded when a buffer changes during a run; command timeouts and output are bounded. Supported
 substitutions are `$file`, `$file_path`, `$file_name`, `$project`, and
 `$project_path`.
 
