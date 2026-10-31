@@ -21,6 +21,11 @@ jobs:
           python-version: "3.11"
       - name: Test package contracts
         run: python -m unittest discover -s tests -v
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22.20.0"
+      - name: Validate lexical and strict Symbol tests in Node
+        run: node --test tests/*.test.cjs
       - name: Compile plugin Python
         run: python -m py_compile oreslang.py
       - name: Validate compiler source pins offline

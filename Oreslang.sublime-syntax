@@ -37,8 +37,10 @@ contexts:
       scope: keyword.oreslang
 
     # Hash Symbol literals are distinct from @annotations and strings.
-    # The doubled single quotes below escape quote delimiters in YAML 1.2.
-    - match: '#(?:{{identifier}}|"(?:\\.|[^"\\\r\n])*"|''(?:\\.|[^''\\\r\n])*'')'
+    # Reject raw newlines, invalid escapes, empty names, and >128-byte ASCII hash names.
+    # Python/Node static regex checks are not a native Sublime syntax-engine verdict.
+    # Unicode normalization and decoded UTF-8 byte budgets require compiler checks.
+    - match: '#(?:[A-Za-z_][A-Za-z0-9_]{0,127}(?![A-Za-z0-9_])|"(?:\\(?:u[0-9A-Fa-f]{4}|["''\\])|[^"\\\r\n])+"|''(?:\\(?:u[0-9A-Fa-f]{4}|["''\\])|[^''\\\r\n])+'')'
       scope: constant.other.symbol.oreslang
 
     # ALL language keywords use the exact same scope by design.
