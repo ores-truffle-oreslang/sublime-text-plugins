@@ -51,8 +51,10 @@ def _expand_command(view):
     configured = _settings().get("cli_command", ["oreslang", "check", "--format=json", "$file"])
     if isinstance(configured, str):
         configured = shlex.split(configured, posix=os.name != "nt")
-    if not isinstance(configured, list) or not configured:
-        raise ValueError("cli_command must be a non-empty string or array")
+    if (not isinstance(configured, list) or not configured or len(configured) > 64
+            or any(not isinstance(part, str) or not part or len(part) > 4096
+                   or "\\0" in part for part in configured)):
+        raise ValueError("cli_command must be an array of 1-64 bounded, nonempty strings")
 
     filename = view.file_name()
     if not filename:
@@ -85,6 +87,14 @@ def _text_coordinate(value):
         return None
     number = int(value)
     return number if 1 <= number < 10_000_000 else None
+
+
+def _resolve_diagnostic_path(reported_path, active_file):
+    # Diagnostics are emitted relative to the CLI working directory (the file's
+    # parent), not Sublime Text's process-wide working directory.
+    if os.path.isabs(reported_path):
+        return os.path.abspath(reported_path)
+    return os.path.abspath(os.path.join(os.path.dirname(active_file), reported_path))
 
 
 def _parse_diagnostics(output, default_file):
@@ -142,7 +152,7 @@ def _parse_diagnostics(output, default_file):
                 severity = "error"
             diagnostics.append(
                 {
-                    "file": os.path.abspath(path),
+                    "file": _resolve_diagnostic_path(path, default_file),
                     "line": row,
                     "column": column,
                     "end_line": end_row,
@@ -166,7 +176,7 @@ def _parse_diagnostics(output, default_file):
                 continue
             diagnostics.append(
                 {
-                    "file": os.path.abspath(path) if path else default_file,
+                    "file": _resolve_diagnostic_path(path, default_file) if path else default_file,
                     "line": row,
                     "column": column,
                     "end_line": row,
@@ -340,6 +350,11 @@ def _run_check(view, force_output=False):
 
     view_id = view.id()
     generation = _next_generation(view_id)
+    if view.is_dirty():
+        sublime.set_timeout(lambda: view.set_status(
+            "oreslang_diagnostics", "Save the .ores file before running compiler checks"), 0)
+        return
+    starting_change = view.change_count()
     filename = os.path.abspath(view.file_name())
 
     try:
@@ -348,7 +363,10 @@ def _run_check(view, force_output=False):
         sublime.set_timeout(lambda: view.set_status("oreslang_diagnostics", str(error)), 0)
         return
 
-    timeout_ms = int(_settings().get("diagnostics_timeout_ms", 15000))
+    try:
+        timeout_ms = max(100, min(60000, int(_settings().get("diagnostics_timeout_ms", 15000))))
+    except (ValueError, TypeError, OverflowError):
+        timeout_ms = 15000
     cwd = os.path.dirname(filename)
 
     try:
@@ -372,7 +390,9 @@ def _run_check(view, force_output=False):
         return_code = 1
 
     def finish():
-        if not view.is_valid() or not _generation_is_current(view_id, generation):
+        if (not view.is_valid() or not _generation_is_current(view_id, generation)
+                or view.change_count() != starting_change or view.is_dirty()
+                or os.path.abspath(view.file_name() or "") != filename):
             return
         _apply_diagnostics(view, diagnostics)
 
@@ -410,7 +430,7 @@ class OreslangDiagnosticsListener(sublime_plugin.EventListener):
             view.erase_regions(DIAGNOSTIC_KEY)
 
     def on_post_save_async(self, view):
-        if _is_oreslang(view) and _settings().get("diagnostics_on_save", True):
+        if _is_oreslang(view) and _settings().get("diagnostics_on_save", False):
             _run_check(view)
 
     def on_modified_async(self, view):

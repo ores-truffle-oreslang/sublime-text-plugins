@@ -66,6 +66,24 @@ class PackageContractTest(unittest.TestCase):
         self.assertNotIn("ores", build["cmd"])
         self.assertNotIn("ores", settings["cli_command"])
 
+    def test_automatic_cli_execution_is_opt_in(self):
+        settings = json.loads((ROOT / "Oreslang.sublime-settings").read_text())
+        self.assertFalse(settings["diagnostics_on_save"])
+        self.assertFalse(settings["diagnostics_on_change"])
+
+    def test_isolated_actor_and_template_scopes(self):
+        syntax = (ROOT / "Oreslang.sublime-syntax").read_text()
+        self.assertIn("isolated", syntax)
+        self.assertIn("critical", syntax)
+        self.assertIn("suspends", syntax)
+        self.assertIn("string.quoted.template.oreslang", syntax)
+        # Lexer recognition is not parser acceptance or deprecation proof.
+        self.assertIn("isoactor", syntax)
+        self.assertIn("null|", syntax)
+        self.assertIn("panic", syntax)
+        self.assertIn("cpu|gpu", syntax)
+        self.assertIn("%=&|^", syntax)
+
     def test_plugin_python_compiles(self):
         source = (ROOT / "oreslang.py").read_text()
         compile(source, str(ROOT / "oreslang.py"), "exec")
@@ -181,6 +199,17 @@ class DiagnosticParserTest(unittest.TestCase):
         self.assertEqual(8, items[0]["end_line"])
         self.assertEqual(5, items[0]["end_column"])
         self.assertEqual("unknown binding", items[0]["message"])
+
+    def test_relative_compiler_diagnostic_paths_are_relative_to_active_file(self):
+        source = "/tmp/project/main.ores"
+        records = self.plugin._parse_diagnostics(json.dumps({
+            "version": 1,
+            "diagnostics": [{"path": "src/dependency.ores", "message": "invalid"}]
+        }), source)
+        self.assertEqual("/tmp/project/src/dependency.ores", records[0]["file"])
+        plain = self.plugin._parse_diagnostics(
+            "src/dependency.ores:2:3: error: invalid", source)
+        self.assertEqual("/tmp/project/src/dependency.ores", plain[0]["file"])
 
     def test_plain_text_coordinates_have_the_same_bounded_admission(self):
         for row, col in [('0','1'),('1','0'),('10000001','2'),('2','10000001'),

@@ -80,7 +80,7 @@ annotations:
 
 The canonical `oreslang` CLI protocol v1 JSON is preferred; plain compiler-style diagnostics remain a compatibility fallback.
 
-By default diagnostics run after save. To enable debounced checks while typing,
+For safety, compiler subprocesses do not run automatically by default: Sublime Text does not provide a VS Code-style workspace trust gate. Use **Oreslang: Check File** manually, or explicitly enable checks after saving a trusted project. To opt into save-time and debounced checks,
 customize `Oreslang.sublime-settings`:
 
 ```json
@@ -92,7 +92,7 @@ customize `Oreslang.sublime-settings`:
 }
 ```
 
-The CLI command is an argument array, not a shell command. Supported
+The CLI command is an argument array, not a shell command. Compiler results are discarded when a buffer changes during a run; command timeouts and output are bounded. Supported
 substitutions are `$file`, `$file_path`, `$file_name`, `$project`, and
 `$project_path`.
 
@@ -120,3 +120,22 @@ hex colors, JSON resources, and diagnostic parser formats.
 ### Compiler compatibility
 
 The editor grammar tracks proposed compiler constructs without changing compiler acceptance. See [docs/compiler-pr-sync.md](docs/compiler-pr-sync.md) for the October 2026 upstream PR matrix and validation gates.
+
+## Installing the verified Sublime package
+
+Successful CI runs upload an **oreslang-sublime-package** Actions artifact. Download the artifact, unzip the outer GitHub artifact ZIP, and copy its **Oreslang.sublime-package** file (without further extraction) into the Sublime Text `Installed Packages` folder:
+
+- Windows: `%APPDATA%\Sublime Text\Installed Packages`
+- macOS: `~/Library/Application Support/Sublime Text/Installed Packages/`
+- Linux: `~/.config/sublime-text/Installed Packages/`
+
+Restart Sublime Text and open a `.ores` file. The native syntax and the package's Python diagnostics are included, but compiler diagnostics still require an installed, trusted `oreslang` CLI. GitHub Actions packaging tests do **not** substitute for real Sublime Text host validation.
+
+To build locally:
+
+~~~sh
+python -m unittest discover -s tests -v
+python tools/package_sublime.py
+~~~
+
+The package is created deterministically in `dist/Oreslang.sublime-package`, with a fixed file allowlist and byte-by-byte verification. No compiler source or credentials are copied into the package.
