@@ -39,8 +39,9 @@ contexts:
     # Hash Symbol literals are distinct from @annotations and strings.
     # Reject raw newlines, invalid escapes, empty names, and >128-byte ASCII hash names.
     # Python/Node static regex checks are not a native Sublime syntax-engine verdict.
-    # Unicode normalization and decoded UTF-8 byte budgets require compiler checks.
-    - match: '#(?:[A-Za-z_][A-Za-z0-9_]{0,127}(?![A-Za-z0-9_])|"(?:\\(?:u[0-9A-Fa-f]{4}|["''\\])|[^"\\\r\n])+"|''(?:\\(?:u[0-9A-Fa-f]{4}|["''\\])|[^''\\\r\n])+'')'
+    # Decode-free grammar enforces escaped surrogate pairs; NFC, decoded source
+    # length, and UTF-8 byte budgets still require authoritative compiler checks.
+    - match: '#(?:[A-Za-z_][A-Za-z0-9_]{0,127}(?![A-Za-z0-9_])|"(?:\\(?:u(?:[dD][89aAbB][0-9A-Fa-f]{2}\\u[dD][c-fC-F][0-9A-Fa-f]{2}|(?![dD][89aAbBcCdDeEfF])[0-9A-Fa-f]{4})|["''\\])|[^"\\\r\n])+"|''(?:\\(?:u(?:[dD][89aAbB][0-9A-Fa-f]{2}\\u[dD][c-fC-F][0-9A-Fa-f]{2}|(?![dD][89aAbBcCdDeEfF])[0-9A-Fa-f]{4})|["''\\])|[^''\\\r\n])+'')'
       scope: constant.other.symbol.oreslang
 
     # ALL language keywords use the exact same scope by design.

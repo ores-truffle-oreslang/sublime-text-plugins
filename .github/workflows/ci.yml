@@ -30,6 +30,15 @@ jobs:
         run: python -m py_compile oreslang.py
       - name: Validate compiler source pins offline
         run: python scripts/check_upstream_syntax.py
+      - name: Build and verify installable Sublime package
+        run: python tools/package_sublime.py
+      - name: Upload Sublime package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: oreslang-sublime-package
+          path: dist/Oreslang.sublime-package
+          if-no-files-found: error
+          retention-days: 14
 
 
   sublime-syntax-engine:

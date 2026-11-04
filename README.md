@@ -156,3 +156,22 @@ The `sublime-syntax-engine` job uses the pinned `SublimeText/syntax-test-action`
 ## Explicit compiler-current default and language-target preview
 
 `Oreslang.sublime-syntax` remains the current compiler-lexer compatibility grammar. `Preview.sublime-syntax` is a distinct **test-only** proposal (file extension `.ores-target-preview`), and the native `syntax_test_oreslang.ores` now selects it explicitly so its contextual-operator and deprecated-token expectations cannot silently override regular `.ores` syntax. The two profiles are pinned in `contracts/editor-syntax/v1/profile-reconciliation.json`; compiler JUnit/guest evidence is still unavailable and independent review remains required.
+
+## Installing the verified Sublime package
+
+Successful CI runs upload an **oreslang-sublime-package** Actions artifact. Download the artifact, unzip the outer GitHub artifact ZIP, and copy its **Oreslang.sublime-package** file (without further extraction) into the Sublime Text `Installed Packages` folder:
+
+- Windows: `%APPDATA%\Sublime Text\Installed Packages`
+- macOS: `~/Library/Application Support/Sublime Text/Installed Packages/`
+- Linux: `~/.config/sublime-text/Installed Packages/`
+
+Restart Sublime Text and open a `.ores` file. The native syntax and the package's Python diagnostics are included, but compiler diagnostics still require an installed, trusted `oreslang` CLI. GitHub Actions packaging tests do **not** substitute for real Sublime Text host validation.
+
+To build locally:
+
+~~~sh
+python -m unittest discover -s tests -v
+python tools/package_sublime.py
+~~~
+
+The package is created deterministically in `dist/Oreslang.sublime-package`, with a fixed file allowlist and byte-by-byte verification. No compiler source or credentials are copied into the package.
