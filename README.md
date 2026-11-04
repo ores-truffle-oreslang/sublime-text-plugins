@@ -121,6 +121,42 @@ hex colors, JSON resources, and diagnostic parser formats.
 
 The editor grammar tracks proposed compiler constructs without changing compiler acceptance. See [docs/compiler-pr-sync.md](docs/compiler-pr-sync.md) for the October 2026 upstream PR matrix and validation gates.
 
+## Cross-editor syntax fixtures and grammar drift
+
+`conformance/oreslang-syntax-v1.json` is the byte-identical lexical fixture
+manifest copied to the VS Code and HTML highlighter repositories.
+`tests/test_conformance.py` checks keywords, exclusions, hash Symbols,
+compound keywords, grammar precedence, and removed operator scopes using
+standard-library Python. It cannot run Sublime's actual syntax engine,
+and must not be reported as editor UI testing or guest compilation.
+
+The fixture pins concrete blob hashes from the Java lexer and EBNF.
+The pinned compiler still recognizes `isoactor`, `null`, `%` and `^`;
+the forward-looking editor target does not. This is an unresolved semantic
+parity delta, not authority to change the compiler automatically.
+
+The shared suite now includes **50 adversarial editor fixtures**.
+
+**Privacy boundary:** The compiler source repository is private.
+Unauthenticated raw.githubusercontent.com requests cannot verify it.
+Public editor workflows must not clone, mirror, or fetch private sources.
+The scheduled watcher was removed; compiler-side lexer/parser proof is
+staged separately in private oreslang-source.java PR #2350 and currently
+has zero executed CI steps. Source-only grammar host tests are not evidence
+of actual Sublime engine behavior or Oreslang guest acceptance.
+
+## Sublime native syntax test fixture
+
+Install the package as `Packages/Oreslang`, open `syntax_test_oreslang.ores` in Sublime Text, and invoke **Tools → Build** to run Sublime's native Syntax Tests. The fixture contains scope assertions for opaque comments, templates, Symbols, compound keywords and contextual comparisons. CI presently checks only fixture integrity; **no real Sublime Text binary executed this fixture in GitHub Actions**.
+
+### Real Sublime syntax engine CI
+
+The `sublime-syntax-engine` job uses the pinned `SublimeText/syntax-test-action` v2.5.1 implementation with a stable Sublime syntax test binary and `package_name: Oreslang`. Unlike Python fixture-inventory tests, this job executes the `syntax_test_oreslang.ores` scope selectors using the native Sublime syntax engine. Treat it as proven only after the dedicated job reports nonzero executed steps and a successful result.
+
+## Explicit compiler-current default and language-target preview
+
+`Oreslang.sublime-syntax` remains the current compiler-lexer compatibility grammar. `Preview.sublime-syntax` is a distinct **test-only** proposal (file extension `.ores-target-preview`), and the native `syntax_test_oreslang.ores` now selects it explicitly so its contextual-operator and deprecated-token expectations cannot silently override regular `.ores` syntax. The two profiles are pinned in `contracts/editor-syntax/v1/profile-reconciliation.json`; compiler JUnit/guest evidence is still unavailable and independent review remains required.
+
 ## Installing the verified Sublime package
 
 Successful CI runs upload an **oreslang-sublime-package** Actions artifact. Download the artifact, unzip the outer GitHub artifact ZIP, and copy its **Oreslang.sublime-package** file (without further extraction) into the Sublime Text `Installed Packages` folder:

@@ -1,0 +1,109 @@
+// SYNTAX TEST "Packages/Oreslang/Oreslang.sublime-syntax"
+
+// Reserved language words
+return
+// <- source.oreslang keyword.oreslang
+actor
+// <- source.oreslang keyword.oreslang
+isoactor
+// <- source.oreslang keyword.oreslang
+cpu
+// <- source.oreslang keyword.oreslang
+gpu
+// <- source.oreslang keyword.oreslang
+
+// Lexical operators are separate from ordinary keywords
+eq
+// <- source.oreslang keyword.operator.comparison.oreslang
+neq
+// <- source.oreslang keyword.operator.comparison.oreslang
+is
+// <- source.oreslang keyword.operator.comparison.oreslang
+
+// Runtime globals
+raise
+// <- source.oreslang support.function.global.oreslang
+throw
+// <- source.oreslang support.function.global.oreslang
+
+// Compound syntax is scoped atomically by the editor
+critical-read
+// <- source.oreslang keyword.oreslang
+critical-write
+// <- source.oreslang keyword.oreslang
+nb-select
+// <- source.oreslang keyword.oreslang
+transform-pipe
+// <- source.oreslang keyword.oreslang
+
+// Hash-prefixed Symbols (both quote styles)
+#ready
+// <- source.oreslang constant.other.symbol.oreslang
+#"quoted value"
+// <- source.oreslang constant.other.symbol.oreslang
+#'with spaces'
+// <- source.oreslang constant.other.symbol.oreslang
+
+// Invalid Symbols cannot receive a valid Symbol scope
+#""
+// <- source.oreslang - constant.other.symbol.oreslang
+#''
+// <- source.oreslang - constant.other.symbol.oreslang
+#"bad\q"
+// <- source.oreslang - constant.other.symbol.oreslang
+#123
+// <- source.oreslang - constant.other.symbol.oreslang
+
+// Nested multiline comment scopes never expose nested code
+/* outer
+// <- source.oreslang comment.block.oreslang
+/* inner
+// <- source.oreslang comment.block.oreslang
+raise #ready
+// <- source.oreslang comment.block.oreslang - support.function.global.oreslang
+*/
+// <- source.oreslang comment.block.oreslang
+throw #ready
+// <- source.oreslang comment.block.oreslang - constant.other.symbol.oreslang
+*/
+return
+// <- source.oreslang keyword.oreslang
+
+// Ordinary strings should not leak keywords or Symbol scopes
+"throw #ready"
+// <- source.oreslang string.quoted.double.oreslang - support.function.global.oreslang
+`raise #ready`
+// <- source.oreslang string.quoted.template.oreslang - constant.other.symbol.oreslang
+
+// BMP Unicode letters share identifier boundaries with Java Lexer.
+returné
+// <- source.oreslang - keyword.oreslang
+eq中
+// <- source.oreslang - keyword.operator.comparison.oreslang
+panicπ
+// <- source.oreslang - keyword.oreslang
+gpuα
+// <- source.oreslang - keyword.oreslang
+éreturn
+//  ^ source.oreslang - keyword.oreslang
+中eq
+//  ^ source.oreslang - keyword.operator.comparison.oreslang
+πpanic
+//  ^ source.oreslang - keyword.oreslang
+return
+// <- source.oreslang keyword.oreslang
+
+// The native compiler accepts paired UTF-16 Symbol escapes, but never lone
+// high/low surrogates. The syntax engine must not imply those are valid.
+#"\uD83D\uDE00"
+// <- source.oreslang constant.other.symbol.oreslang
+#'\uD83D\uDE00'
+// <- source.oreslang constant.other.symbol.oreslang
+#"\uD800"
+// <- source.oreslang - constant.other.symbol.oreslang
+#"\uDE00"
+// <- source.oreslang - constant.other.symbol.oreslang
+#"\uDE00\uD83D"
+// <- source.oreslang - constant.other.symbol.oreslang
+#"\uD83D\u0061"
+// <- source.oreslang - constant.other.symbol.oreslang

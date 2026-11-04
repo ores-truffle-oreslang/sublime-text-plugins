@@ -1,9 +1,12 @@
+import itertools
 import json
 import os
 import re
+import signal
 import shlex
 import subprocess
 import threading
+import time
 
 import sublime
 import sublime_plugin
@@ -23,6 +26,11 @@ _ORESLANG_DIAGNOSTIC = re.compile(
 
 _generation_lock = threading.Lock()
 _generations = {}
+_generation_sequence = itertools.count(1)
+
+
+class _CompilerCheckCancelled(Exception):
+    """A view closed or changed while its check was running."""
 
 
 def _is_oreslang(view):
@@ -33,7 +41,9 @@ def _is_oreslang(view):
 
 def _next_generation(view_id):
     with _generation_lock:
-        value = _generations.get(view_id, 0) + 1
+        # Unique across recycled Sublime view IDs, including after on_close
+        # drops obsolete generation entries to avoid leaking closed tabs.
+        value = next(_generation_sequence)
         _generations[view_id] = value
         return value
 
@@ -297,10 +307,27 @@ def _show_output(view, command, return_code, output):
     window.run_command("show_panel", {"panel": "output.oreslang"})
 
 
-def _run_compiler_bounded(argv, cwd, timeout, max_bytes=1024 * 1024):
+def _terminate_process_tree(process):
+    """Stop the POSIX CLI process group, including inherited-pipe helpers."""
+    if os.name == 'posix' and process.pid:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+            return
+        except ProcessLookupError:
+            return
+        except OSError:
+            pass
+    try:
+        process.kill()
+    except OSError:
+        pass
+
+
+def _run_compiler_bounded(argv, cwd, timeout, max_bytes=1024 * 1024, cancelled=None):
     if timeout <= 0 or max_bytes <= 0:
         raise ValueError('positive timeout and output budget required')
-    process = subprocess.Popen(argv, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(argv, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               start_new_session=(os.name == 'posix'))
     chunks = [bytearray(), bytearray()]
     lock = threading.Lock()
     exceeded = threading.Event()
@@ -319,7 +346,7 @@ def _run_compiler_bounded(argv, cwd, timeout, max_bytes=1024 * 1024):
                     total += len(block)
                     if total > max_bytes:
                         exceeded.set()
-                        process.kill()
+                        _terminate_process_tree(process)
         finally:
             pipe.close()
 
@@ -327,13 +354,26 @@ def _run_compiler_bounded(argv, cwd, timeout, max_bytes=1024 * 1024):
                for i, pipe in enumerate((process.stdout, process.stderr))]
     for reader in readers:
         reader.start()
+    deadline = time.monotonic() + timeout
     try:
-        process.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait()
-        raise
+        while True:
+            if cancelled is not None and cancelled():
+                _terminate_process_tree(process)
+                process.wait()
+                raise _CompilerCheckCancelled()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                _terminate_process_tree(process)
+                process.wait()
+                raise subprocess.TimeoutExpired(argv, timeout)
+            try:
+                process.wait(timeout=min(0.05, remaining))
+                break
+            except subprocess.TimeoutExpired:
+                continue
     finally:
+        # Even a successful leader exit may leave helpers holding open pipes.
+        _terminate_process_tree(process)
         for reader in readers:
             reader.join(timeout=1)
     if any(reader.is_alive() for reader in readers):
@@ -371,11 +411,18 @@ def _run_check(view, force_output=False):
 
     try:
         completed = _run_compiler_bounded(
-            command, cwd, max(1.0, timeout_ms / 1000.0)
+            command, cwd, max(1.0, timeout_ms / 1000.0),
+            cancelled=lambda: (not view.is_valid()
+                or not _generation_is_current(view_id, generation)
+                or view.change_count() != starting_change or view.is_dirty()
+                or os.path.abspath(view.file_name() or "") != filename)
         )
         output = "\n".join(part for part in (completed.stdout, completed.stderr) if part)
         diagnostics = _parse_diagnostics(output, filename)
         return_code = completed.returncode
+    except _CompilerCheckCancelled:
+        # A closed/edited tab must not publish a stale error or open a panel.
+        return
     except FileNotFoundError:
         output = "Oreslang CLI not found: {}".format(command[0])
         diagnostics = []
@@ -427,19 +474,31 @@ class OreslangClearDiagnosticsCommand(sublime_plugin.TextCommand):
 class OreslangDiagnosticsListener(sublime_plugin.EventListener):
     def on_load_async(self, view):
         if _is_oreslang(view):
+            _next_generation(view.id())
             view.erase_regions(DIAGNOSTIC_KEY)
+            view.erase_status("oreslang_diagnostics")
 
     def on_post_save_async(self, view):
         if _is_oreslang(view) and _settings().get("diagnostics_on_save", False):
             _run_check(view)
 
     def on_modified_async(self, view):
-        if not _is_oreslang(view) or not _settings().get("diagnostics_on_change", False):
+        if not _is_oreslang(view):
             return
 
         view_id = view.id()
         generation = _next_generation(view_id)
-        delay = int(_settings().get("diagnostics_delay_ms", 650))
+        # Even with automatic checks disabled, edits revoke old squigglies
+        # and invalidate an explicit CLI check already running.
+        view.erase_regions(DIAGNOSTIC_KEY)
+        view.erase_status("oreslang_diagnostics")
+        if not _settings().get("diagnostics_on_change", False):
+            return
+        try:
+            delay = int(_settings().get("diagnostics_delay_ms", 650))
+        except (ValueError, OverflowError, TypeError):
+            delay = 650
+        delay = max(0, min(5000, delay))
 
         def delayed():
             if view.is_valid() and _generation_is_current(view_id, generation):
@@ -448,4 +507,5 @@ class OreslangDiagnosticsListener(sublime_plugin.EventListener):
         sublime.set_timeout_async(delayed, max(0, delay))
 
     def on_close(self, view):
-        _next_generation(view.id())
+        with _generation_lock:
+            _generations.pop(view.id(), None)

@@ -1,109 +1,41 @@
-// SYNTAX TEST "Packages/sublime-text-plugins/Oreslang.sublime-syntax"
-
-// Reserved language words
-return
-// <- source.oreslang keyword.oreslang
-actor
-// <- source.oreslang keyword.oreslang
-isoactor
-// <- source.oreslang keyword.oreslang
-cpu
-// <- source.oreslang keyword.oreslang
-gpu
-// <- source.oreslang keyword.oreslang
-
-// Lexical operators are separate from ordinary keywords
-eq
-// <- source.oreslang keyword.operator.comparison.oreslang
-neq
-// <- source.oreslang keyword.operator.comparison.oreslang
-is
-// <- source.oreslang keyword.operator.comparison.oreslang
-
-// Runtime globals
-raise
-// <- source.oreslang support.function.global.oreslang
-throw
-// <- source.oreslang support.function.global.oreslang
-
-// Compound syntax is scoped atomically by the editor
-critical-read
-// <- source.oreslang keyword.oreslang
-critical-write
-// <- source.oreslang keyword.oreslang
-nb-select
-// <- source.oreslang keyword.oreslang
-transform-pipe
-// <- source.oreslang keyword.oreslang
-
-// Hash-prefixed Symbols (both quote styles)
-#ready
-// <- source.oreslang constant.other.symbol.oreslang
-#"quoted value"
-// <- source.oreslang constant.other.symbol.oreslang
-#'with spaces'
-// <- source.oreslang constant.other.symbol.oreslang
-
-// Invalid Symbols cannot receive a valid Symbol scope
-#""
-// <- source.oreslang - constant.other.symbol.oreslang
-#''
-// <- source.oreslang - constant.other.symbol.oreslang
-#"bad\q"
-// <- source.oreslang - constant.other.symbol.oreslang
-#123
-// <- source.oreslang - constant.other.symbol.oreslang
-
-// Nested multiline comment scopes never expose nested code
-/* outer
-// <- source.oreslang comment.block.oreslang
-/* inner
-// <- source.oreslang comment.block.oreslang
-raise #ready
-// <- source.oreslang comment.block.oreslang - support.function.global.oreslang
-*/
-// <- source.oreslang comment.block.oreslang
-throw #ready
-// <- source.oreslang comment.block.oreslang - constant.other.symbol.oreslang
-*/
-return
-// <- source.oreslang keyword.oreslang
-
-// Ordinary strings should not leak keywords or Symbol scopes
-"throw #ready"
-// <- source.oreslang string.quoted.double.oreslang - support.function.global.oreslang
-`raise #ready`
-// <- source.oreslang string.quoted.template.oreslang - constant.other.symbol.oreslang
-
-// BMP Unicode letters share identifier boundaries with Java Lexer.
-returné
+// SYNTAX TEST "Packages/Oreslang/Preview.sublime-syntax"
+pub fnc run() { return; }
+// <- keyword.oreslang
+//  ^^^ keyword.oreslang
+//      ^^^ entity.name.function.oreslang
+//              ^^^ keyword.oreslang
+/* outer /* return */ recover */ pub fnc ok() {}
+//          ^^^ comment.block.oreslang - keyword.oreslang
+//                    ^^^ comment.block.oreslang - support.function.global.oreslang
+//                               ^^^ keyword.oreslang
+//                                   ^^^ keyword.oreslang
+const s = "if recover"; defer;
+// <- keyword.oreslang
+//         ^^ string.quoted.double.oreslang - keyword.oreslang
+//            ^^^ string.quoted.double.oreslang - support.function.global.oreslang
+//                      ^^^ support.function.global.oreslang
+const t = `if actor`; return;
+//         ^^ string.quoted.template.oreslang - keyword.oreslang
+//            ^^^ string.quoted.template.oreslang - keyword.oreslang
+//                    ^^^ keyword.oreslang
+nb-select critical-read critical-write transform-pipe
+// <- keyword.oreslang
+//        ^^^ keyword.oreslang
+//                      ^^^ keyword.oreslang
+//                                     ^^^ keyword.oreslang
+const a = #ready; const b = #'two words';
+//        ^^^ constant.other.symbol.oreslang
+//                          ^^^ constant.other.symbol.oreslang
+let eq = 1; left eq right;
+//  ^^ source.oreslang - keyword.operator.comparison.oreslang
+//               ^^ keyword.operator.comparison.oreslang
+define isolated actor Worker as end
+// <- keyword.oreslang
+//     ^^^ keyword.oreslang
+//              ^^^ keyword.oreslang
+//                              ^^^ keyword.oreslang
+null isoactor % ^
 // <- source.oreslang - keyword.oreslang
-eq中
-// <- source.oreslang - keyword.operator.comparison.oreslang
-panicπ
-// <- source.oreslang - keyword.oreslang
-gpuα
-// <- source.oreslang - keyword.oreslang
-éreturn
-//  ^ source.oreslang - keyword.oreslang
-中eq
-//  ^ source.oreslang - keyword.operator.comparison.oreslang
-πpanic
-//  ^ source.oreslang - keyword.oreslang
-return
-// <- source.oreslang keyword.oreslang
-
-// The native compiler accepts paired UTF-16 Symbol escapes, but never lone
-// high/low surrogates. The syntax engine must not imply those are valid.
-#"\uD83D\uDE00"
-// <- source.oreslang constant.other.symbol.oreslang
-#'\uD83D\uDE00'
-// <- source.oreslang constant.other.symbol.oreslang
-#"\uD800"
-// <- source.oreslang - constant.other.symbol.oreslang
-#"\uDE00"
-// <- source.oreslang - constant.other.symbol.oreslang
-#"\uDE00\uD83D"
-// <- source.oreslang - constant.other.symbol.oreslang
-#"\uD83D\u0061"
-// <- source.oreslang - constant.other.symbol.oreslang
+//   ^^^ source.oreslang - keyword.oreslang
+//            ^ source.oreslang - keyword.operator.oreslang
+//              ^ source.oreslang - keyword.operator.oreslang

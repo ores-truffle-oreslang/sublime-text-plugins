@@ -1,0 +1,81 @@
+{
+  "schema": "oreslang.editor-syntax-profile-reconciliation/v1",
+  "version": 1,
+  "authority": {
+    "repository": "ores-truffle-oreslang/oreslang-source.java",
+    "lexerBlobSha": "bba9e091c0ad1c9b75e0c61e9dd173fcc18a236a",
+    "tokenBlobSha": "c82b527e2f6c6c0b941c8bdca69bb78b53159965",
+    "grammarBlobSha": "7ecfe82817945a1972cf9ac47df3466efab1822b"
+  },
+  "profiles": {
+    "compiler-current": {
+      "contractPath": "contracts/editor-syntax/v1/editor-lexical-contract.json",
+      "gitBlobSha": "e9dbf3b6fad5562b7ca6df631ab3c45f478480ba",
+      "evidence": "lexer source snapshot only; 69-case native parser suite is blocked before runner steps",
+      "reservedComparisonWords": [
+        "eq",
+        "neq",
+        "is"
+      ],
+      "reservedLegacyWords": [
+        "isoactor",
+        "null"
+      ],
+      "operatorTokenCharacters": [
+        "%",
+        "^"
+      ],
+      "activation": "original hardening PR baseline"
+    },
+    "language-target": {
+      "contractPath": "conformance/oreslang-syntax-v1.json",
+      "gitBlobSha": "269b5e607ffd8d30fa267ac85a3ee47518ce25c3",
+      "evidence": "50 public editor highlighting fixtures + engine tests; compiler adoption unverified",
+      "contextualIdentifierWords": [
+        "eq",
+        "neq",
+        "is"
+      ],
+      "excludedReservedWords": [
+        "isoactor",
+        "null"
+      ],
+      "excludedArithmeticOperators": [
+        "%",
+        "^",
+        "^^"
+      ],
+      "activation": "stacked PR preview"
+    }
+  },
+  "resolution": {
+    "activeStackedEditorProfile": "compiler-current",
+    "mergeGate": "BLOCKED_COMPILER_PARITY",
+    "allowedToSwitch": "Only after private compiler PR #2350 executes exact-head tests and semantic differences are independently reviewed",
+    "preserveCompilerLexerSnapshot": true,
+    "explicitlyNotEquivalent": true,
+    "previewArtifactOnly": true,
+    "previewArtifactsByRepository": {
+      "vscode-plugins": [
+        "lib/scan-target-preview.js",
+        "syntaxes/oreslang-target-preview.tmLanguage.json"
+      ],
+      "sublime-text-plugins": [
+        "Preview.sublime-syntax",
+        "syntax_test_oreslang.ores"
+      ],
+      "html-js-css-syntax-highlighter": [
+        "src/plugins/oreslang-target-preview.js"
+      ]
+    }
+  },
+  "differenceIds": [
+    "eq-neq-is",
+    "isoactor",
+    "null",
+    "percent",
+    "caret",
+    "double-caret"
+  ],
+  "notes": "Two distinct pinned lexical profiles: the default editor grammar follows the current private compiler lexer snapshot, while the language-target grammar is an unregistered, test-only preview. This is not proof of executed private compiler JUnit or guest acceptance. Do not activate the preview as the default or merge without an independently reviewed language decision."
+}
