@@ -4,12 +4,14 @@ on:
   pull_request:
     paths:
       - "Oreslang.sublime-syntax"
+      - "Preview.sublime-syntax"
       - "syntax_test_oreslang.ores"
       - ".github/workflows/native-syntax.yml"
   push:
     branches: [main]
     paths:
       - "Oreslang.sublime-syntax"
+      - "Preview.sublime-syntax"
       - "syntax_test_oreslang.ores"
       - ".github/workflows/native-syntax.yml"
 
@@ -35,11 +37,12 @@ jobs:
           git diff --quiet --exit-code
           test -z "$(git ls-files --others --exclude-standard)"
           test -s syntax_test_oreslang.ores
-          grep -F 'SYNTAX TEST "Packages/sublime-text-plugins/Oreslang.sublime-syntax"' syntax_test_oreslang.ores
+          test -s Preview.sublime-syntax
+          grep -F 'SYNTAX TEST "Packages/Oreslang/Preview.sublime-syntax"' syntax_test_oreslang.ores
       - name: Execute native Sublime Text syntax tests (pinned build 4215)
         uses: SublimeText/syntax-test-action@872dccb36bdf23a020c4689422d22d8ff38da918
         with:
           build: '4215'
-          package_name: sublime-text-plugins
+          package_name: Oreslang
           package_root: .
           default_packages: "false"
