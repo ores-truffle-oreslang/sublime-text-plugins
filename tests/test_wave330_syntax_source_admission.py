@@ -36,7 +36,7 @@ class SyntaxSourceAdmission(unittest.TestCase):
         corrupted = original.replace(b"  - ores", b"  - changed", 1)
         self.assertNotIn(b"  - ores", corrupted)
         target.write_bytes(corrupted)
-        with self.assertRaisesRegex(ValueError, "sublime"):
+        with self.assertRaisesRegex(ValueError, "Sublime syntax"):
             package.package_files(self.root)
         target.write_bytes(original)
         self.assertEqual(package.package_files(self.root)["Oreslang.sublime-syntax"], original)
