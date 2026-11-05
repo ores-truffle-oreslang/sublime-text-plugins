@@ -35,6 +35,12 @@ def package_files(root: Path = ROOT) -> dict[str, bytes]:
 
 
 def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
+    # ZipFile opens existing leaf symlinks for writing; never let a package
+    # request replace a reviewed source member or an unrelated file.
+    if dest.is_symlink():
+        raise ValueError("symlinked package destination")
+    if dest.resolve() in {ROOT / name for name in MEMBERS}:
+        raise ValueError("package destination would replace a source file")
     dest.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(dest, "w") as archive:
         for name in sorted(files):
