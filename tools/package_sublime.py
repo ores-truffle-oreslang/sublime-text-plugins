@@ -57,8 +57,14 @@ def verify_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
             raise ValueError("Archive contains unexpected package files")
         for name, expected in files.items():
             info = archive.getinfo(name)
-            if info.compress_type != zipfile.ZIP_STORED or \
-               info.date_time != FIXED_DATE or archive.read(name) != expected:
+            # Canonical package members must be regular Unix files. The source
+            # bytes alone do not bind a ZIP entry's file type or permissions:
+            # a tampered archive could otherwise advertise a symlink.
+            if (info.create_system != 3 or
+                    info.external_attr != (0o100644 << 16) or
+                    info.compress_type != zipfile.ZIP_STORED or
+                    info.date_time != FIXED_DATE or
+                    archive.read(name) != expected):
                 raise ValueError("Package verification failed: " + name)
 
 
