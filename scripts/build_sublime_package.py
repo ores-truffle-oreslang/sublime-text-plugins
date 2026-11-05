@@ -18,7 +18,12 @@ FILES = (
 ARCHIVE_NAME = "Oreslang.sublime-package"
 
 def build(dest: Path) -> str:
-    if dest.resolve().is_relative_to(ROOT) and dest.name in FILES:
+    # Refuse alias destinations: ZipFile("w") follows leaf symlinks and could
+    # overwrite a trusted source file or an unrelated external sentinel.
+    if dest.is_symlink():
+        raise ValueError("symlinked release destination")
+    resolved = dest.resolve()
+    if resolved.is_relative_to(ROOT) and resolved.name in FILES:
         raise ValueError("archive cannot replace a source file")
     dest.parent.mkdir(parents=True, exist_ok=True)
     if len(FILES) != len(set(FILES)):
