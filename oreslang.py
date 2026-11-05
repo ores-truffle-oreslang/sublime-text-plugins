@@ -63,7 +63,7 @@ def _expand_command(view):
         configured = shlex.split(configured, posix=os.name != "nt")
     if (not isinstance(configured, list) or not configured or len(configured) > 64
             or any(not isinstance(part, str) or not part or len(part) > 4096
-                   or "\\0" in part for part in configured)):
+                   or chr(0) in part for part in configured)):
         raise ValueError("cli_command must be an array of 1-64 bounded, nonempty strings")
 
     filename = view.file_name()
