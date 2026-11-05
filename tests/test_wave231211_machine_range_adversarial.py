@@ -38,7 +38,7 @@ class Wave231211MachineRangeAdmission(unittest.TestCase):
             {"message": "bad float", "range": {"start": {"line": 4.5, "column": 2}}},
             {"message": "reversed", "range": {"start": {"line": 4, "column": 8},
                                              "end": {"line": 4, "column": 7}}},
-            {"message": "overflowed implicit end", "range": {"start": {"line": 2, "column": 10000000}}},
+            {"message": "oversized explicit end", "range": {"start": {"line": 2, "column": 4}, "end": {"line": 2, "column": 10000001}}},
             {"message": "last valid boundary", "severity": "HINT",
              "range": {"start": {"line": 10000000, "column": 9999999},
                        "end": {"line": 10000000, "column": 10000000}}},
