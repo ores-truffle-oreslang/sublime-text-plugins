@@ -65,10 +65,17 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
 
 def verify_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
     with zipfile.ZipFile(dest, "r") as archive:
+        # Identity includes metadata outside the member payload and filename.
+        # ZIP comments and extras can carry unreviewed data in an otherwise
+        # byte-identical allowlisted package.
+        if archive.comment:
+            raise ValueError("Package verification failed: archive comment")
         if archive.namelist() != sorted(MEMBERS):
             raise ValueError("Archive contains unexpected package files")
         for name, expected in files.items():
             info = archive.getinfo(name)
+            if info.comment or info.extra:
+                raise ValueError("Package verification failed: member metadata: " + name)
             # Canonical package members must be regular Unix files. The source
             # bytes alone do not bind a ZIP entry's file type or permissions:
             # a tampered archive could otherwise advertise a symlink.
