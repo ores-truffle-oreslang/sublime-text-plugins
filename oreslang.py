@@ -35,7 +35,7 @@ class _CompilerCheckCancelled(Exception):
 
 def _is_oreslang(view):
     if view is None or not view.is_valid() or view.size() == 0:
-        return bool(view and view.file_name() and view.file_name().endswith(".ores"))
+        return bool(view and view.file_name() and view.file_name().endswith((".ores", ".atto")))
     return view.match_selector(0, "source.oreslang")
 
 
