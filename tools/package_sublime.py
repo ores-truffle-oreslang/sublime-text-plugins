@@ -45,6 +45,10 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
         raise ValueError("symlinked package destination")
     if dest.resolve() in {ROOT / name for name in MEMBERS}:
         raise ValueError("package destination would replace a source file")
+    # An existing hardlink has a different path but the SAME inode as its source.
+    # ZipFile("w") would truncate the reviewed source through that alias.
+    if dest.is_file() and any(dest.samefile(ROOT / name) for name in MEMBERS):
+        raise ValueError("package destination hardlinks a reviewed source file")
     dest.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(dest, "w") as archive:
         for name in sorted(files):
