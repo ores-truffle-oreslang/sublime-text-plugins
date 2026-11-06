@@ -3,6 +3,7 @@
 name: Oreslang
 file_extensions:
   - ores
+  - atto
 scope: source.oreslang
 
 variables:
