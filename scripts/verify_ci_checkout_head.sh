@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Source-owned CI preflight only: verifies the checked-out Git identity.
+# Source-owned CI preflight only: verifies exact checked-out Git identity and bytes.
 set -euo pipefail
 export LC_ALL=C
 
@@ -30,4 +30,16 @@ actual="$(/usr/bin/git -C "$root" rev-parse --verify 'HEAD^{commit}' 2>/dev/null
 tree="$(/usr/bin/git -C "$root" rev-parse --verify 'HEAD^{tree}' 2>/dev/null)" ||
   fail "missing HEAD tree"
 [[ "$tree" =~ ^[0-9a-f]{40}$ ]] || fail "invalid HEAD tree identity"
+# Exact HEAD alone is not an exact-source proof: smudged, staged, modified,
+# untracked or ignored working-tree files can change what a later test executes.
+# Disable filesystem monitors and avoid hooks / external diff commands.
+tracked_or_untracked="$(/usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/null \
+  -C "$root" status --porcelain=v1 --untracked-files=all 2>/dev/null)" ||
+  fail "cannot inspect checkout worktree"
+[[ -z "$tracked_or_untracked" ]] || fail "checkout has staged, modified or untracked files"
+ignored="$(/usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/null \
+  -C "$root" ls-files --others --ignored --exclude-standard 2>/dev/null)" ||
+  fail "cannot inspect ignored checkout files"
+[[ -z "$ignored" ]] || fail "checkout has ignored files"
+
 printf 'EXACT_SOURCE_HEAD=%s\nEXACT_SOURCE_TREE=%s\n' "$actual" "$tree"
