@@ -105,6 +105,16 @@ class ExactSourceCheckoutGate(unittest.TestCase):
         (self.root / "ignored.atto").write_text("fnc main(): int { return 2; }\n", encoding="utf-8")
         self.assert_dirty_denied("checkout has ignored files")
 
+    def test_assume_unchanged_does_not_hide_tampered_source(self):
+        self.git("update-index", "--assume-unchanged", "source.atto")
+        (self.root / "source.atto").write_text("MALICIOUS\n", encoding="utf-8")
+        self.assert_dirty_denied("unsafe Git index flags")
+
+    def test_skip_worktree_does_not_hide_tampered_source(self):
+        self.git("update-index", "--skip-worktree", "source.atto")
+        (self.root / "source.atto").write_text("MALICIOUS\n", encoding="utf-8")
+        self.assert_dirty_denied("unsafe Git index flags")
+
     def test_untracked_symlink_is_denied(self):
         (self.root / "foreign.atto").symlink_to("source.atto")
         self.assert_dirty_denied()
