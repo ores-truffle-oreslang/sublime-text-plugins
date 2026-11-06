@@ -35,6 +35,10 @@ def package_files(root: Path = ROOT) -> dict[str, bytes]:
 
 
 def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
+    # Validate the complete archive manifest BEFORE creating/truncating a file.
+    # The helper is importable by callers other than the trusted CLI entrypoint.
+    if set(files) != set(MEMBERS) or any(type(data) is not bytes for data in files.values()):
+        raise ValueError("package members must match the reviewed byte allowlist")
     # ZipFile opens existing leaf symlinks for writing; never let a package
     # request replace a reviewed source member or an unrelated file.
     if dest.is_symlink():
