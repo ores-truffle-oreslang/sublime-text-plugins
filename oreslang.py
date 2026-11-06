@@ -185,6 +185,9 @@ def _parse_diagnostics(output, default_file):
         match = _STANDARD_DIAGNOSTIC.match(line)
         if match:
             path, row, column, severity, message = match.groups()
+            # A NUL-bearing origin must never be attached to the active view.
+            if "\x00" in path:
+                continue
             row, column = _text_coordinate(row), _text_coordinate(column)
             if row is None or column is None or column == 10_000_000:
                 continue
