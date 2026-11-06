@@ -25,7 +25,7 @@ class ReleaseHardlinkDestination(unittest.TestCase):
             dest = Path(temporary) / "reviewed-release.sublime-package"
             os.link(source, dest)
             with patch.object(release, "ROOT", root):
-                with self.assertRaisesRegex(ValueError, "hardlinks a source"):
+                with self.assertRaisesRegex(ValueError, "hardlink"):
                     release.build(dest)
                 self.assertEqual(source.read_bytes(), baseline["Oreslang.sublime-syntax"])
                 self.assertEqual(dest.read_bytes(), baseline["Oreslang.sublime-syntax"])
