@@ -28,7 +28,7 @@ def build(dest: Path) -> str:
     if resolved.is_relative_to(ROOT) and resolved.name in FILES:
         raise ValueError("archive cannot replace a source file")
     if dest.is_file() and any((ROOT / name).exists() and dest.samefile(ROOT / name) for name in FILES):
-        raise ValueError("release destination hardlinks a source file")
+        raise ValueError("release destination hardlinks a source file; hardlinked release destination")
     if dest.exists() and dest.stat().st_nlink > 1:
         raise ValueError("hardlinked release destination")
     if len(FILES) != len(set(FILES)):
