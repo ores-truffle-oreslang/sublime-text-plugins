@@ -78,5 +78,37 @@ class ExactSourceCheckoutGate(unittest.TestCase):
         self.assertIn("not at checkout root", result.stderr)
 
 
+    def assert_dirty_denied(self, expected="checkout has staged, modified or untracked files"):
+        result = self.check(self.head)
+        self.assertEqual(result.returncode, 65, result.stdout + result.stderr)
+        self.assertIn(expected, result.stderr)
+        self.assertNotIn("EXACT_SOURCE_HEAD=", result.stdout)
+
+    def test_modified_tracked_source_is_denied_despite_matching_head(self):
+        (self.root / "source.atto").write_text("fnc main(): int { return 9; }\n", encoding="utf-8")
+        self.assert_dirty_denied()
+
+    def test_staged_source_rewrite_is_denied_despite_matching_head(self):
+        (self.root / "source.atto").write_text("fnc main(): int { return 9; }\n", encoding="utf-8")
+        self.git("add", "source.atto")
+        self.assert_dirty_denied()
+
+    def test_untracked_checkout_file_is_denied_despite_matching_head(self):
+        (self.root / "foreign.atto").write_text("fnc main(): int { return 2; }\n", encoding="utf-8")
+        self.assert_dirty_denied()
+
+    def test_ignored_checkout_file_is_denied_despite_matching_head(self):
+        (self.root / ".gitignore").write_text("ignored.atto\n", encoding="utf-8")
+        self.git("add", ".gitignore")
+        self.git("commit", "-qm", "fixture ignore rule")
+        self.head = self.git("rev-parse", "HEAD").stdout.strip()
+        (self.root / "ignored.atto").write_text("fnc main(): int { return 2; }\n", encoding="utf-8")
+        self.assert_dirty_denied("checkout has ignored files")
+
+    def test_untracked_symlink_is_denied(self):
+        (self.root / "foreign.atto").symlink_to("source.atto")
+        self.assert_dirty_denied()
+
+
 if __name__ == "__main__":
     unittest.main()
