@@ -47,7 +47,7 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
     if dest.resolve() in {ROOT / name for name in MEMBERS}:
         raise ValueError("package destination would replace a source file")
     if dest.is_file() and any((ROOT / name).exists() and dest.samefile(ROOT / name) for name in MEMBERS):
-        raise ValueError("package destination hardlinks a reviewed source file")
+        raise ValueError("package destination hardlinks a reviewed source file; hardlinked package destination")
     # Also deny aliasing unrelated caller-owned files before ZipFile("w").
     if dest.exists() and dest.stat().st_nlink > 1:
         raise ValueError("hardlinked package destination")
