@@ -43,6 +43,10 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
     # request replace a reviewed source member or an unrelated file.
     if dest.is_symlink():
         raise ValueError("symlinked package destination")
+    # A hardlink is not a symlink: ZipFile('w') would overwrite the shared
+    # inode and corrupt a trusted source or caller-owned sentinel.
+    if dest.exists() and dest.stat().st_nlink > 1:
+        raise ValueError("hardlinked package destination")
     if dest.resolve() in {ROOT / name for name in MEMBERS}:
         raise ValueError("package destination would replace a source file")
     dest.parent.mkdir(parents=True, exist_ok=True)
