@@ -61,6 +61,11 @@ def verify(dest: Path) -> None:
         if names != sorted(FILES):
             raise ValueError("release archive contains unexpected, missing or duplicate files")
         for entry in archive.infolist():
+            # Canonical release ZIPs never emit per-member extras/comments and
+            # every member uses DEFLATE. Matching payload bytes alone is not
+            # enough to bind the reviewed, reproducible archive metadata.
+            if entry.compress_type != zipfile.ZIP_DEFLATED or entry.extra or entry.comment:
+                raise ValueError("noncanonical ZIP member metadata")
             if entry.date_time != (1980, 1, 1, 0, 0, 0):
                 raise ValueError("nonreproducible archive timestamp")
             if entry.create_system != 3 or (entry.external_attr >> 16) != 0o100644:
