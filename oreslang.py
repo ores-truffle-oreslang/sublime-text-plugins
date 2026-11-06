@@ -35,7 +35,7 @@ class _CompilerCheckCancelled(Exception):
 
 def _is_oreslang(view):
     if view is None or not view.is_valid() or view.size() == 0:
-        return bool(view and view.file_name() and view.file_name().endswith(".ores"))
+        return bool(view and view.file_name() and view.file_name().endswith((".ores", ".atto")))
     return view.match_selector(0, "source.oreslang")
 
 
@@ -185,6 +185,9 @@ def _parse_diagnostics(output, default_file):
         match = _STANDARD_DIAGNOSTIC.match(line)
         if match:
             path, row, column, severity, message = match.groups()
+            # NUL-bearing legacy origins cannot be valid editor file paths.
+            if "\x00" in path:
+                continue
             row, column = _text_coordinate(row), _text_coordinate(column)
             if row is None or column is None or column == 10_000_000:
                 continue

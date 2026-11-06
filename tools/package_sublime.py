@@ -43,13 +43,12 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
     # request replace a reviewed source member or an unrelated file.
     if dest.is_symlink():
         raise ValueError("symlinked package destination")
-    # A reviewed source-inode alias needs the specific failure diagnostic;
-    # check it before the generic hardlink denial, with both before ZipFile.
+    # More specific reviewed-source denial must precede generic hardlinks.
     if dest.resolve() in {ROOT / name for name in MEMBERS}:
         raise ValueError("package destination would replace a source file")
     if dest.is_file() and any((ROOT / name).exists() and dest.samefile(ROOT / name) for name in MEMBERS):
         raise ValueError("package destination hardlinks a reviewed source file")
-    # A hardlink to any other file also risks truncating caller-owned data.
+    # Also deny aliasing unrelated caller-owned files before ZipFile("w").
     if dest.exists() and dest.stat().st_nlink > 1:
         raise ValueError("hardlinked package destination")
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -63,7 +62,15 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
 
 
 def verify_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
+    # A partial caller-provided expectation must never self-certify an archive.
+    # The same complete trusted manifest is required by create_package().
+    if set(files) != set(MEMBERS) or any(type(data) is not bytes for data in files.values()):
+        raise ValueError("package members must match the reviewed byte allowlist")
     with zipfile.ZipFile(dest, "r") as archive:
+        # The packager emits no global ZIP comment. Reject metadata-only
+        # changes even when member contents and canonical names are unchanged.
+        if archive.comment:
+            raise ValueError("Package verification failed: unexpected archive comment")
         if archive.namelist() != sorted(MEMBERS):
             raise ValueError("Archive contains unexpected package files")
         for name, expected in files.items():
@@ -75,6 +82,7 @@ def verify_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
                     info.external_attr != (0o100644 << 16) or
                     info.compress_type != zipfile.ZIP_STORED or
                     info.date_time != FIXED_DATE or
+                    info.extra or info.comment or
                     archive.read(name) != expected):
                 raise ValueError("Package verification failed: " + name)
 

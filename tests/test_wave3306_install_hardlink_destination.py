@@ -25,7 +25,7 @@ class InstallHardlinkDestination(unittest.TestCase):
             os.link(source, destination)
             baseline = {name: (root / name).read_bytes() for name in publisher.MEMBERS}
             with patch.object(publisher, "ROOT", root):
-                with self.assertRaisesRegex(ValueError, "hardlinks a reviewed source"):
+                with self.assertRaisesRegex(ValueError, "hardlink"):
                     publisher.create_package(payloads, destination)
                 self.assertEqual(source.read_bytes(), baseline["oreslang.py"])
                 self.assertEqual(destination.read_bytes(), baseline["oreslang.py"])

@@ -22,20 +22,20 @@ def build(dest: Path) -> str:
     # overwrite a trusted source file or an unrelated external sentinel.
     if dest.is_symlink():
         raise ValueError("symlinked release destination")
-    # Prefer a precise source-inode denial before the general hardlink check;
-    # both paths must reject before ZipFile can truncate the destination.
+    # Refuse a reviewed source-inode hardlink before the generic hardlink
+    # guard so both cases remain fail-closed with precise diagnostics.
     resolved = dest.resolve()
     if resolved.is_relative_to(ROOT) and resolved.name in FILES:
         raise ValueError("archive cannot replace a source file")
     if dest.is_file() and any((ROOT / name).exists() and dest.samefile(ROOT / name) for name in FILES):
         raise ValueError("release destination hardlinks a source file")
-    # Also deny hardlinks to unrelated caller-owned files, not just source files.
     if dest.exists() and dest.stat().st_nlink > 1:
         raise ValueError("hardlinked release destination")
     if len(FILES) != len(set(FILES)):
         raise ValueError("duplicate package paths")
-    # Validate every source before opening the artifact, preserving a
-    # previously verified release if an input disappears or becomes a symlink.
+    # Validate every reviewed member and snapshot its bytes before touching
+    # the output directory/archive: a missing or symlinked late member must
+    # never truncate an existing verified package.
     payloads = {}
     for name in sorted(FILES):
         source = ROOT / name
@@ -57,10 +57,19 @@ def build(dest: Path) -> str:
 
 def verify(dest: Path) -> None:
     with zipfile.ZipFile(dest) as archive:
+        # Out-of-band ZIP comments are not emitted by the reproducible builder.
+        # They can carry forged release attestations despite identical member bytes.
+        if archive.comment:
+            raise ValueError("unexpected ZIP archive comment")
         names = archive.namelist()
         if names != sorted(FILES):
             raise ValueError("release archive contains unexpected, missing or duplicate files")
         for entry in archive.infolist():
+            # Canonical release ZIPs never emit per-member extras/comments and
+            # every member uses DEFLATE. Matching payload bytes alone is not
+            # enough to bind the reviewed, reproducible archive metadata.
+            if entry.compress_type != zipfile.ZIP_DEFLATED or entry.extra or entry.comment:
+                raise ValueError("noncanonical ZIP member metadata")
             if entry.date_time != (1980, 1, 1, 0, 0, 0):
                 raise ValueError("nonreproducible archive timestamp")
             if entry.create_system != 3 or (entry.external_attr >> 16) != 0o100644:
