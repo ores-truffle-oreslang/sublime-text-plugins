@@ -151,6 +151,9 @@ def _parse_diagnostics(output, default_file):
                     or end_row < row or (end_row == row and end_column <= column)):
                 continue
             path = item.get("path")
+            # JSON can carry NUL bytes in a forged origin; refuse the record.
+            if isinstance(path, str) and "\x00" in path:
+                continue
             if not isinstance(path, str) or not path:
                 path = default_file
             message = item.get("message")
@@ -181,6 +184,8 @@ def _parse_diagnostics(output, default_file):
         match = _STANDARD_DIAGNOSTIC.match(line)
         if match:
             path, row, column, severity, message = match.groups()
+            if "\x00" in path:
+                continue
             row, column = _text_coordinate(row), _text_coordinate(column)
             if row is None or column is None or column == 10_000_000:
                 continue
