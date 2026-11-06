@@ -1,6 +1,5 @@
 """Local Git identity admissions; never claims compiler/guest execution."""
 import os
-import re
 import subprocess
 import tempfile
 import unittest
@@ -114,6 +113,42 @@ class ExactSourceCheckoutGate(unittest.TestCase):
         self.git("update-index", "--skip-worktree", "source.atto")
         (self.root / "source.atto").write_text("MALICIOUS\n", encoding="utf-8")
         self.assert_dirty_denied("unsafe Git index flags")
+
+    def test_core_filemode_false_cannot_hide_exec_bit_change(self):
+        script = self.root / "run.sh"
+        script.write_text("#!/bin/sh\necho hello\n", encoding="utf-8")
+        script.chmod(0o644)
+        self.git("add", "run.sh")
+        self.git("commit", "-qm", "tracked non-executable script")
+        self.head = self.git("rev-parse", "HEAD").stdout.strip()
+        script.chmod(0o755)
+        self.git("config", "core.filemode", "false")
+        self.assert_dirty_denied()
+
+    def test_core_symlinks_false_cannot_hide_replaced_symlink(self):
+        link = self.root / "source-alias.atto"
+        link.symlink_to("source.atto")
+        self.git("add", "source-alias.atto")
+        self.git("commit", "-qm", "tracked symlink")
+        self.head = self.git("rev-parse", "HEAD").stdout.strip()
+        link.unlink()
+        link.write_text("source.atto", encoding="utf-8")
+        self.git("config", "core.symlinks", "false")
+        self.assert_dirty_denied()
+
+    def test_core_ignorecase_true_cannot_hide_case_variant_new_file(self):
+        (self.root / "SOURCE.atto").write_text("untracked attacker source\n", encoding="utf-8")
+        self.git("config", "core.ignorecase", "true")
+        self.assert_dirty_denied()
+
+    def test_clean_checkout_is_accepted_with_relaxed_repository_git_config(self):
+        for key, value in (("core.filemode", "false"), ("core.symlinks", "false"),
+                           ("core.ignorecase", "true"), ("core.checkstat", "minimal"),
+                           ("core.trustctime", "false"), ("core.untrackedCache", "true")):
+            self.git("config", key, value)
+        result = self.check(self.head)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("EXACT_SOURCE_HEAD=" + self.head, result.stdout)
 
     def test_untracked_symlink_is_denied(self):
         (self.root / "foreign.atto").symlink_to("source.atto")
