@@ -65,6 +65,10 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
 
 def verify_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
     with zipfile.ZipFile(dest, "r") as archive:
+        # The packager emits no global ZIP comment. Reject metadata-only
+        # changes even when member contents and canonical names are unchanged.
+        if archive.comment:
+            raise ValueError("Package verification failed: unexpected archive comment")
         if archive.namelist() != sorted(MEMBERS):
             raise ValueError("Archive contains unexpected package files")
         for name, expected in files.items():
@@ -76,6 +80,7 @@ def verify_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
                     info.external_attr != (0o100644 << 16) or
                     info.compress_type != zipfile.ZIP_STORED or
                     info.date_time != FIXED_DATE or
+                    info.extra or info.comment or
                     archive.read(name) != expected):
                 raise ValueError("Package verification failed: " + name)
 
