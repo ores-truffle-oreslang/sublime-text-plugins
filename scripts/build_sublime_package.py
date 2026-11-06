@@ -45,6 +45,10 @@ def build(dest: Path) -> str:
 
 def verify(dest: Path) -> None:
     with zipfile.ZipFile(dest) as archive:
+        # Out-of-band ZIP comments are not emitted by the reproducible builder.
+        # They can carry forged release attestations despite identical member bytes.
+        if archive.comment:
+            raise ValueError("unexpected ZIP archive comment")
         names = archive.namelist()
         if names != sorted(FILES):
             raise ValueError("release archive contains unexpected, missing or duplicate files")
