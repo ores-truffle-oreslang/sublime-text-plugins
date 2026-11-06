@@ -17,10 +17,21 @@ export function githubRestReader({ token, fetcher = fetch, maxBytes = MAX_BYTES 
       !Number.isSafeInteger(maxBytes) || maxBytes < 256 || maxBytes > MAX_BYTES)
     throw TypeError('read-only GitHub client requires token, transport and bounded size');
   return async path => {
-    if (typeof path !== 'string' ||
-        !/^\/repos\/ores-truffle-oreslang\/[A-Za-z0-9._-]+\/[A-Za-z0-9_./-]+(?:\?[a-z0-9_=&-]+)?$/.test(path) ||
-        path.includes('..') || path.includes('//') || path.includes('%') ||
-        path.includes('\\') || path.includes('#'))
+    // Deliberately allow only metadata needed by this audit. Never allow
+    // contents/blobs/code-search, workflow logs, repository source or arbitrary
+    // GitHub endpoints: a read-only token can still disclose private source.
+    const route = typeof path === 'string' && /^\/repos\/ores-truffle-oreslang\/[A-Za-z0-9._-]+\/(.+)$/.exec(path);
+    const suffix = route?.[1];
+    const allowed = typeof suffix === 'string' && (
+      /^pulls\/[1-9]\d*(?:\/reviews\?per_page=100&page=[1-8])?$/.test(suffix) ||
+      /^branches\/main(?:\/protection)?$/.test(suffix) ||
+      /^git\/commits\/[0-9a-f]{40}$/.test(suffix) ||
+      /^actions\/runs\/[1-9]\d*(?:\/attempts\/[1-9]\d*\/jobs\?per_page=100&page=[1-8]|\/artifacts\?per_page=100&page=[1-8])?$/.test(suffix) ||
+      /^commits\/[0-9a-f]{40}\/check-runs\?per_page=100&page=[1-8]$/.test(suffix) ||
+      /^actions\/jobs\/[1-9]\d*$/.test(suffix)
+    );
+    if (!allowed || path.includes('..') || path.includes('//') ||
+        path.includes('%') || path.includes('\\') || path.includes('#'))
       throw Error('READ_PATH_DENIED');
     const response = await fetcher('https://api.github.com' + path, {
       method: 'GET', redirect: 'manual', headers: {

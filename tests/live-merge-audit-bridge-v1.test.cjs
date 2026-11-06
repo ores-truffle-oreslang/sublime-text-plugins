@@ -171,6 +171,28 @@ test('read-only REST transport sends GET and bearer token to exact GitHub host',
   assert.equal(captured.options.redirect,'manual');
   assert.equal(captured.options.headers.authorization,'Bearer secret-do-not-print');
 });
+test('transport allowlist admits only bounded evidence metadata endpoints',async()=>{
+  const seen=[];
+  const get=githubRestReader({token:'secret',fetcher:async(url,options)=>{
+    seen.push(url);
+    assert.equal(options.method,'GET');
+    return new Response(JSON.stringify({id:1}),{status:200});
+  }});
+  const routes=[
+    ROOT+'/pulls/7',
+    ROOT+'/branches/main',
+    ROOT+'/branches/main/protection',
+    ROOT+'/git/commits/'+A,
+    ROOT+'/pulls/7/reviews?per_page=100&page=1',
+    ROOT+'/actions/runs/51',
+    ROOT+'/actions/runs/51/attempts/1/jobs?per_page=100&page=2',
+    ROOT+'/commits/'+A+'/check-runs?per_page=100&page=3',
+    ROOT+'/actions/runs/51/artifacts?per_page=100&page=4',
+    ROOT+'/actions/jobs/71'
+  ];
+  for(const route of routes)assert.deepEqual(await get(route),{id:1});
+  assert.equal(seen.length,routes.length);
+});
 test('transport denies traversal, redirected credentials, oversized and non-200 responses',async()=>{
   let count=0;
   const get=githubRestReader({token:'secret',maxBytes:512,fetcher:async ()=>{
@@ -178,7 +200,11 @@ test('transport denies traversal, redirected credentials, oversized and non-200 
   }});
   for(const path of [
     'https://evil.example/steal',ROOT+'/../users',ROOT+'/%2e%2e/users',
-    ROOT+'//pulls/7',ROOT+'/pulls/7#x',ROOT+'/pulls/7?q=%2f'
+    ROOT+'//pulls/7',ROOT+'/pulls/7#x',ROOT+'/pulls/7?q=%2f',
+    ROOT+'/contents/README.md',ROOT+'/git/blobs/'+A,
+    ROOT+'/actions/jobs/71/logs',ROOT+'/issues/7',
+    ROOT+'/pulls/7/files',ROOT+'/branches/not-main',
+    ROOT+'/pulls/7?unsafe=true'
   ])await assert.rejects(get(path),/READ_PATH_DENIED/);
   assert.equal(count,0);
   const bad=githubRestReader({token:'secret',fetcher:async()=>
