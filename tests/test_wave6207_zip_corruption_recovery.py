@@ -26,7 +26,7 @@ class Wave6207StoredPackageCRC(unittest.TestCase):
             needle = b"source.oreslang"
             self.assertIn(needle, files["Oreslang.sublime-syntax"])
             self.assertIn(needle, original)
-            corrupted = original.replace(needle, b"source.oresxlang", 1)
+            corrupted = original.replace(needle, b"source.oresXang", 1)
             self.assertNotEqual(corrupted, original)
             output.write_bytes(corrupted)
             with self.assertRaises((zipfile.BadZipFile, ValueError)):
