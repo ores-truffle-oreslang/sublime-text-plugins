@@ -80,6 +80,10 @@ test('all independently required negative mutations fail closed', () => {
     x => { x.artifacts[0].job_id = 99; },
     x => { x.artifacts[0].size = 0; },
     x => { x.jobs.push(structuredClone(x.jobs[0])); },
+    x => { x.reviews.push({ ...x.reviews[0], state: 'CHANGES_REQUESTED', submitted_at: '2026-11-06T22:00:00Z' }); },
+    x => { x.reviews.push({ ...x.reviews[0], state: 'DISMISSED', submitted_at: '2026-11-06T22:00:00Z' }); },
+    x => { x.reviews.push({ ...x.reviews[0], commit_id: 'd'.repeat(40), submitted_at: '2026-11-06T22:00:00Z' }); },
+    x => { x.reviews.push({ ...x.reviews[0], user: 'outside-reviewer', state: 'CHANGES_REQUESTED', submitted_at: '2026-11-06T22:00:00Z' }); },
     x => { x.reviews.push(structuredClone(x.reviews[0])); }
   ];
   for (const [i, mutate] of mutants.entries()) {
@@ -87,7 +91,7 @@ test('all independently required negative mutations fail closed', () => {
     mutate(x);
     assert.notEqual(qualifyMergeEvidence(x).classification, 'CANDIDATE_QUALIFIED', 'mutation ' + i);
   }
-  assert.equal(mutants.length, 38);
+  assert.equal(mutants.length, 42);
 });
 test('no steps on a failed run is admission evidence, never test success', () => {
   for (const steps of [[], null]) {

@@ -99,12 +99,30 @@ export function qualifyMergeEvidence(input) {
       return denied('CHECKOUT_RECEIPT_NOT_BOUND_TO_SUCCESSFUL_STEP');
   }
   if (checkouts.length !== jobs.length) return denied('FOREIGN_CHECKOUT_RECEIPT');
-  const approvals = reviews.filter(r => r.state === 'APPROVED' &&
-    str(r.user) && r.user.toLowerCase() !== e.author.toLowerCase() &&
+  // Last submitted review is authoritative for each reviewer. A past APPROVED
+  // event cannot outvote a later CHANGES_REQUESTED, DISMISSED, COMMENTED,
+  // or an approval on a different HEAD. Ambiguous timestamps fail closed.
+  const latestByReviewer = new Map();
+  for (const review of reviews) {
+    if (!str(review.user) ||
+        !['APPROVED', 'CHANGES_REQUESTED', 'COMMENTED', 'DISMISSED'].includes(review.state) ||
+        !isSha(review.commit_id) || !strictUtc(review.submitted_at))
+      return denied('INVALID_REVIEW_TIMELINE');
+    const reviewer = review.user.toLowerCase();
+    const prev = latestByReviewer.get(reviewer);
+    if (!prev || prev.submitted_at < review.submitted_at)
+      latestByReviewer.set(reviewer, review);
+    else if (prev.submitted_at === review.submitted_at)
+      return denied('AMBIGUOUS_REVIEW_TIMELINE');
+  }
+  const latest = [...latestByReviewer.values()];
+  if (latest.some(r => r.state === 'CHANGES_REQUESTED'))
+    return denied('OUTSTANDING_CHANGES_REQUESTED');
+  const approvals = latest.filter(r => r.state === 'APPROVED' &&
+    r.user.toLowerCase() !== e.author.toLowerCase() &&
     e.code_owners.some(owner => owner.toLowerCase() === r.user.toLowerCase()) &&
-    r.commit_id === e.head_sha && strictUtc(r.submitted_at));
-  if (unique(approvals.map(r => r.user.toLowerCase())) === false ||
-      approvals.length < b.required_pull_request_reviews.required_approving_review_count)
+    r.commit_id === e.head_sha);
+  if (approvals.length < b.required_pull_request_reviews.required_approving_review_count)
     return denied('INDEPENDENT_CURRENT_HEAD_CODEOWNER_APPROVAL_MISSING');
   if (artifacts.length !== e.required_artifacts.length ||
       !unique(artifacts.map(a => a.name)))
