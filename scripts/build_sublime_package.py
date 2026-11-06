@@ -22,31 +22,35 @@ def build(dest: Path) -> str:
     # overwrite a trusted source file or an unrelated external sentinel.
     if dest.is_symlink():
         raise ValueError("symlinked release destination")
-    # A regular-looking output may also be a hardlink to a trusted source or
-    # unrelated file. Writing ZipFile('w') would truncate every such alias.
-    if dest.exists() and dest.stat().st_nlink > 1:
-        raise ValueError("hardlinked release destination")
+    # Refuse a reviewed source-inode hardlink before the generic hardlink
+    # guard so both cases remain fail-closed with precise diagnostics.
     resolved = dest.resolve()
     if resolved.is_relative_to(ROOT) and resolved.name in FILES:
         raise ValueError("archive cannot replace a source file")
-    # The resolved path alone misses a distinct hardlink to a reviewed source inode.
-    # Check before opening ZipFile("w"), which would truncate the source itself.
-    if dest.is_file() and any(dest.samefile(ROOT / name) for name in FILES):
-        raise ValueError("release destination hardlinks a source file")
-    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.is_file() and any((ROOT / name).exists() and dest.samefile(ROOT / name) for name in FILES):
+        raise ValueError("release destination hardlinks a source file; hardlinked release destination")
+    if dest.exists() and dest.stat().st_nlink > 1:
+        raise ValueError("hardlinked release destination")
     if len(FILES) != len(set(FILES)):
         raise ValueError("duplicate package paths")
+    # Validate every reviewed member and snapshot its bytes before touching
+    # the output directory/archive: a missing or symlinked late member must
+    # never truncate an existing verified package.
+    payloads = {}
+    for name in sorted(FILES):
+        source = ROOT / name
+        if not source.is_file() or source.is_symlink():
+            raise ValueError(f"missing or symlinked required release file: {name}")
+        payloads[name] = source.read_bytes()
+    dest.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(dest, "w", compression=zipfile.ZIP_DEFLATED,
                          compresslevel=9, strict_timestamps=True) as archive:
         for name in sorted(FILES):
-            source = ROOT / name
-            if not source.is_file() or source.is_symlink():
-                raise ValueError(f"missing or symlinked required release file: {name}")
             entry = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
             entry.create_system = 3
             entry.external_attr = 0o100644 << 16
             entry.compress_type = zipfile.ZIP_DEFLATED
-            archive.writestr(entry, source.read_bytes(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
+            archive.writestr(entry, payloads[name], compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
     verify(dest)
     sha = hashlib.sha256(dest.read_bytes()).hexdigest()
     return sha
