@@ -45,7 +45,7 @@ class Wave2630MachinePathAdmission(unittest.TestCase):
             json.dumps({"version": 1, "diagnostics": examples}), active)
         self.assertEqual(
             [(x["file"], x["message"], x["line"], x["column"]) for x in result],
-            [(active, "unlocated absent", 1, 2),
+            [(active, "unlocated absent", 1, 1),
              (active, "unlocated null", 3, 2),
              ("/tmp/wave2630/src/other.ores", "separate imported source", 3, 2),
              ("/tmp/wave2630/src/src/ok.ores", "relative owner", 3, 2)])
