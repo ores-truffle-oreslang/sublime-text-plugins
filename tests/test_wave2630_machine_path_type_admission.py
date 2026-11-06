@@ -31,7 +31,8 @@ class Wave2630MachinePathAdmission(unittest.TestCase):
     def test_invalid_explicit_origins_cannot_impersonate_active_file(self):
         active = "/tmp/wave2630/src/main.ores"
         def record(origin, message):
-            return {"path": origin, "line": 3, "column": 2, "message": message}
+            return {"path": origin, "range": {"start": {"line": 3, "column": 2}},
+                    "message": message}
 
         examples = [
             {"line": 1, "column": 2, "message": "unlocated absent"},
