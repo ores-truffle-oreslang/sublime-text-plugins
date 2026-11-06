@@ -147,8 +147,8 @@ def _parse_diagnostics(output, default_file):
                 continue
             end_row = position(end.get("line"), row)
             end_column = position(end.get("column"), column + 1 if end_row == row else 1)
-            if (end_row is None or end_column is None or end_row < row
-                    or (end_row == row and end_column <= column)):
+            if (end_row is None or end_column is None or end_column > 10_000_000
+                    or end_row < row or (end_row == row and end_column <= column)):
                 continue
             path = item.get("path")
             if not isinstance(path, str) or not path:
@@ -182,7 +182,7 @@ def _parse_diagnostics(output, default_file):
         if match:
             path, row, column, severity, message = match.groups()
             row, column = _text_coordinate(row), _text_coordinate(column)
-            if row is None or column is None:
+            if row is None or column is None or column == 10_000_000:
                 continue
             diagnostics.append(
                 {
@@ -201,7 +201,7 @@ def _parse_diagnostics(output, default_file):
         if match:
             row, column, message = match.groups()
             row, column = _text_coordinate(row), _text_coordinate(column)
-            if row is None or column is None:
+            if row is None or column is None or column == 10_000_000:
                 continue
             diagnostics.append(
                 {
