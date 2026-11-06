@@ -35,7 +35,7 @@ class ParentSymlinkGuardTests(unittest.TestCase):
             # Lexical dot-dot paths must not sidestep the ancestor walk.
             with self.assertRaisesRegex(ValueError, "noncanonical package destination parent"):
                 publisher.create_package(files, root / "nested" / ".." / "redirect" / "release.sublime-package")
-            self.assertEqual(sentinel.read_bytes(), b"unrelated user-owned sentinel\\n")
+            self.assertEqual(sentinel.read_bytes(), b"unrelated user-owned sentinel\n")
 
             # A symlinked ancestor should also be refused when the leaf is absent.
             with self.assertRaisesRegex(ValueError, "symlinked package destination parent"):
