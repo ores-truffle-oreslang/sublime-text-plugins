@@ -30,6 +30,17 @@ actual="$(/usr/bin/git -C "$root" rev-parse --verify 'HEAD^{commit}' 2>/dev/null
 tree="$(/usr/bin/git -C "$root" rev-parse --verify 'HEAD^{tree}' 2>/dev/null)" ||
   fail "missing HEAD tree"
 [[ "$tree" =~ ^[0-9a-f]{40}$ ]] || fail "invalid HEAD tree identity"
+# Git's assume-unchanged and skip-worktree index bits can hide altered files
+# from status/diff even when HEAD and the Git tree are correct. Fail closed on
+# any nonordinary index tag before inspecting worktree changes.
+index_entries="$(/usr/bin/git -c core.fsmonitor=false -c core.quotePath=true \
+  -C "$root" ls-files -v 2>/dev/null)" ||
+  fail "cannot inspect Git index flags"
+[[ -n "$index_entries" ]] || fail "empty checked-out Git index"
+while IFS= read -r entry; do
+  [[ "$entry" == "H "* ]] || fail "unsafe Git index flags"
+done <<< "$index_entries"
+
 # Exact HEAD alone is not an exact-source proof: smudged, staged, modified,
 # untracked or ignored working-tree files can change what a later test executes.
 # Disable filesystem monitors and avoid hooks / external diff commands.
