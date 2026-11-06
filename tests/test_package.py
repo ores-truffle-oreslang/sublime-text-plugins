@@ -152,7 +152,7 @@ class DiagnosticParserTest(unittest.TestCase):
                 {"message": "boolean", "range": {"start": {"column": True}}},
                 {"message": "bad end", "range": {"start": {"line": 7, "column": 3},
                     "end": {"line": 6, "column": 2}}},
-                {"message": "valid multiline", "path": {"not": "a string"},
+                {"message": "valid multiline", "path": None,
                  "severity": "unknown", "range": {
                      "start": {"line": 7, "column": 20},
                      "end": {"line": 8, "column": 2}}},

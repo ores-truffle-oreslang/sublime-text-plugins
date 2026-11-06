@@ -22,20 +22,28 @@ def build(dest: Path) -> str:
     # overwrite a trusted source file or an unrelated external sentinel.
     if dest.is_symlink():
         raise ValueError("symlinked release destination")
+    # A regular-looking output may also be a hardlink to a trusted source or
+    # unrelated file. Writing ZipFile('w') would truncate every such alias.
+    if dest.exists() and dest.stat().st_nlink > 1:
+        raise ValueError("hardlinked release destination")
     resolved = dest.resolve()
     if resolved.is_relative_to(ROOT) and resolved.name in FILES:
         raise ValueError("archive cannot replace a source file")
     if len(FILES) != len(set(FILES)):
         raise ValueError("duplicate package paths")
-    # Admit the complete immutable payload before opening/truncating a release
-    # artifact. A missing or symlinked later source must not destroy an
-    # existing verified destination or publish a partially written archive.
+    # Admit every source and snapshot its payload before opening/truncating a
+    # release artifact. A missing or symlinked later member cannot destroy a
+    # verified package, nor can it cause hardlink checks to stat a missing file.
     entries = []
     for name in sorted(FILES):
         source = ROOT / name
         if not source.is_file() or source.is_symlink():
             raise ValueError(f"missing or symlinked required release file: {name}")
         entries.append((name, source.read_bytes()))
+    # The resolved path alone misses a distinct hardlink to a reviewed source inode.
+    # Check before opening ZipFile("w"), which would truncate the source itself.
+    if dest.is_file() and any(dest.samefile(ROOT / name) for name in FILES):
+        raise ValueError("release destination hardlinks a source file")
     dest.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(dest, "w", compression=zipfile.ZIP_DEFLATED,
                          compresslevel=9, strict_timestamps=True) as archive:
