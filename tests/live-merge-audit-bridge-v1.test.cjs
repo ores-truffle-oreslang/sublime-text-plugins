@@ -118,8 +118,13 @@ test('null-step workflow is unverified, not a test pass',async()=>{
   assert.equal(r.policy.classification,'UNVERIFIED');
 });
 test('run attempt and job identity mismatches fail closed',async()=>{
-  const f=mock();
-  f.records[ROOT+'/actions/jobs/71'].run_attempt=2;
+  const f=mock(), original=f.args.get;
+  f.args.get=async path=>{
+    const record=await original(path);
+    // Change only the independently re-fetched job, not the list summary.
+    if(path===ROOT+'/actions/jobs/71')record.run_attempt=2;
+    return record;
+  };
   const r=await inspectLiveMergeCandidate(f.args);
   assert.ok(r.reasons.includes('JOB_SUMMARY_DETAIL_MISMATCH'));
 });
