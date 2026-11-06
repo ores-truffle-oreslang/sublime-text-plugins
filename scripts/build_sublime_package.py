@@ -22,13 +22,21 @@ def build(dest: Path) -> str:
     # overwrite a trusted source file or an unrelated external sentinel.
     if dest.is_symlink():
         raise ValueError("symlinked release destination")
+    # A regular-looking output may also be a hardlink to a trusted source or
+    # unrelated file. Writing ZipFile('w') would truncate every such alias.
+    if dest.exists() and dest.stat().st_nlink > 1:
+        raise ValueError("hardlinked release destination")
     resolved = dest.resolve()
     if resolved.is_relative_to(ROOT) and resolved.name in FILES:
         raise ValueError("archive cannot replace a source file")
+    # The resolved path alone misses a distinct hardlink to a reviewed source inode.
+    # Check before opening ZipFile("w"), which would truncate the source itself.
+    if dest.is_file() and any((ROOT / name).exists() and dest.samefile(ROOT / name) for name in FILES):
+        raise ValueError("release destination hardlinks a source file")
     if len(FILES) != len(set(FILES)):
         raise ValueError("duplicate package paths")
-    # Fail before opening the destination, so missing or symlinked source
-    # members cannot truncate an existing, previously verified release.
+    # Validate every source before opening the artifact, preserving a
+    # previously verified release if an input disappears or becomes a symlink.
     payloads = {}
     for name in sorted(FILES):
         source = ROOT / name

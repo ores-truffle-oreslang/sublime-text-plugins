@@ -150,9 +150,13 @@ def _parse_diagnostics(output, default_file):
             if (end_row is None or end_column is None or end_column > 10_000_000
                     or end_row < row or (end_row == row and end_column <= column)):
                 continue
+            # Absent/null machine origins are unlocated; a present but
+            # malformed origin must not forge diagnostics for this editor tab.
             path = item.get("path")
-            if not isinstance(path, str) or not path:
+            if path is None:
                 path = default_file
+            elif not isinstance(path, str) or not path or "\0" in path:
+                continue
             message = item.get("message")
             if not isinstance(message, str) or not message.strip():
                 continue
