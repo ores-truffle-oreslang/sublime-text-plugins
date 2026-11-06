@@ -64,12 +64,10 @@ ignored="$(/usr/bin/git -c core.fsmonitor=false -c core.hooksPath=/dev/null \
 # through Git's clean/smudge filters. Preserve newline- and tab-bearing paths.
 /usr/bin/git -C "$root" ls-tree -r -z HEAD |
 while IFS= read -r -d '' item; do
-  [[ "$item" == *
-\t'* ]] || fail "malformed Git tree entry"
-  meta="${item%%
-\t'*}"
-  path="${item#*
-\t'}"
+  tab="$(printf '\011')"
+  [[ "$item" == *"$tab"* ]] || fail "malformed Git tree entry"
+  meta="${item%%"$tab"*}"
+  path="${item#*"$tab"}"
   mode="${meta%% *}"
   type_and_oid="${meta#* }"
   type="${type_and_oid%% *}"
