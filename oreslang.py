@@ -151,8 +151,12 @@ def _parse_diagnostics(output, default_file):
                     or end_row < row or (end_row == row and end_column <= column)):
                 continue
             path = item.get("path")
-            if not isinstance(path, str) or not path:
+            # A genuinely unlocated record may use null/omit its origin.
+            # An explicitly malformed origin must not be rebadged as this view.
+            if path is None:
                 path = default_file
+            elif not isinstance(path, str) or not path or "\x00" in path:
+                continue
             message = item.get("message")
             if not isinstance(message, str) or not message.strip():
                 continue
@@ -181,6 +185,8 @@ def _parse_diagnostics(output, default_file):
         match = _STANDARD_DIAGNOSTIC.match(line)
         if match:
             path, row, column, severity, message = match.groups()
+            if "\x00" in path:
+                continue
             row, column = _text_coordinate(row), _text_coordinate(column)
             if row is None or column is None or column == 10_000_000:
                 continue
