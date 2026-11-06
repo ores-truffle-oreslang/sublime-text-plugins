@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import sys
+import tempfile
 import zipfile
 from pathlib import Path
 
@@ -34,31 +36,53 @@ def package_files(root: Path = ROOT) -> dict[str, bytes]:
     return content
 
 
-def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
-    # Validate the complete archive manifest BEFORE creating/truncating a file.
-    # The helper is importable by callers other than the trusted CLI entrypoint.
-    if set(files) != set(MEMBERS) or any(type(data) is not bytes for data in files.values()):
-        raise ValueError("package members must match the reviewed byte allowlist")
-    # ZipFile opens existing leaf symlinks for writing; never let a package
-    # request replace a reviewed source member or an unrelated file.
+def _validate_destination(dest: Path) -> None:
+    """Reject aliases to sources and caller-owned files before any replacement."""
     if dest.is_symlink():
         raise ValueError("symlinked package destination")
-    # More specific reviewed-source denial must precede generic hardlinks.
     if dest.resolve() in {ROOT / name for name in MEMBERS}:
         raise ValueError("package destination would replace a source file")
     if dest.is_file() and any((ROOT / name).exists() and dest.samefile(ROOT / name) for name in MEMBERS):
         raise ValueError("package destination hardlinks a reviewed source file; hardlinked package destination")
-    # Also deny aliasing unrelated caller-owned files before ZipFile("w").
     if dest.exists() and dest.stat().st_nlink > 1:
         raise ValueError("hardlinked package destination")
+
+
+def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
+    # Validate the complete archive manifest BEFORE touching the destination.
+    if set(files) != set(MEMBERS) or any(type(data) is not bytes for data in files.values()):
+        raise ValueError("package members must match the reviewed byte allowlist")
+    _validate_destination(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(dest, "w") as archive:
-        for name in sorted(files):
-            info = zipfile.ZipInfo(name, date_time=FIXED_DATE)
-            info.compress_type = zipfile.ZIP_STORED
-            info.create_system = 3
-            info.external_attr = 0o100644 << 16
-            archive.writestr(info, files[name])
+
+    # ZipFile(dest, "w") used to truncate the caller's path after preflight:
+    # a symlink/hardlink inserted between the check and open could overwrite
+    # its target. Stage exclusively in the same directory, never writing to
+    # the caller's destination inode, then atomically rename the completed ZIP.
+    staged: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w+b", prefix=".oreslang-release-",
+                                         suffix=".tmp", dir=dest.parent, delete=False) as stream:
+            staged = Path(stream.name)
+            with zipfile.ZipFile(stream, "w") as archive:
+                for name in sorted(files):
+                    info = zipfile.ZipInfo(name, date_time=FIXED_DATE)
+                    info.compress_type = zipfile.ZIP_STORED
+                    info.create_system = 3
+                    info.external_attr = 0o100644 << 16
+                    archive.writestr(info, files[name])
+            stream.flush()
+            os.fsync(stream.fileno())
+
+        # A replacement race can still change the directory entry; revalidate
+        # after staging. os.replace never follows a leaf symlink or writes
+        # through a hardlink even if the entry changes after this last check.
+        _validate_destination(dest)
+        os.replace(staged, dest)
+        staged = None
+    finally:
+        if staged is not None:
+            staged.unlink(missing_ok=True)
 
 
 def verify_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
