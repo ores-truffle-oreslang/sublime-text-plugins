@@ -1,0 +1,90 @@
+name: Source-bound release provenance (v1)
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/source-bound-release-provenance-v1.yml'
+      - 'scripts/source_bound_release_receipt_v1.py'
+      - 'tests/test_source_bound_release_receipt_v1.py'
+      - 'docs/SOURCE_BOUND_RELEASE_PROVENANCE_V1.md'
+      - 'scripts/verify_ci_checkout_head.sh'
+      - 'scripts/build_sublime_package.py'
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  candidate-receipt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify immutable source head and physical Git tree
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bash scripts/verify_ci_checkout_head.sh
+      - name: Run source-bound candidate receipt negative controls
+        run: python3 -m unittest discover -s tests -p 'test_source_bound_release_receipt_v1.py' -v
+      - name: Build release archive from pinned source
+        run: python3 scripts/build_sublime_package.py --output dist/Oreslang.sublime-package
+      - name: Emit unsigned source-bound candidate receipt
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 scripts/source_bound_release_receipt_v1.py
+      - name: Upload candidate source-bound receipt (not signed)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: source-bound-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            dist/Oreslang.sublime-package
+            dist/source-bound-release-receipt-v1.json
+          if-no-files-found: error
+          retention-days: 14
+
+  # No OIDC or attestations:write permission on pull requests, including
+  # unreviewed same-repository PRs. Signed provenance is main-only.
+  signed-main-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: candidate-receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify main's immutable source head and physical Git tree
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: bash scripts/verify_ci_checkout_head.sh
+      - name: Build release archive from reviewed main source
+        run: python3 scripts/build_sublime_package.py --output dist/Oreslang.sublime-package
+      - name: Emit source-bound main candidate manifest
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: python3 scripts/source_bound_release_receipt_v1.py
+      - name: Sign archive subject with GitHub OIDC provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: dist/Oreslang.sublime-package
+      - name: Publish signed-release candidate and manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: source-bound-main-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            dist/Oreslang.sublime-package
+            dist/source-bound-release-receipt-v1.json
+          if-no-files-found: error
+          retention-days: 30
