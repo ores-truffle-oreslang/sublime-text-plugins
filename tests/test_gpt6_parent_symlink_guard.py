@@ -18,18 +18,24 @@ class ParentSymlinkGuardTests(unittest.TestCase):
             sentinel = external / "release.sublime-package"
             sentinel.write_bytes(b"unrelated user-owned sentinel\n")
             redirect = root / "redirect"
+            (external / "subdir").mkdir()
             try:
                 redirect.symlink_to(external, target_is_directory=True)
             except (OSError, NotImplementedError):
                 self.skipTest("directory symlinks unsupported")
             for destination in (
                 redirect / "release.sublime-package",
-                root / "nested" / ".." / "redirect" / "release.sublime-package",
+                redirect / "subdir" / "release.sublime-package",
             ):
                 with self.subTest(destination=str(destination)):
                     with self.assertRaisesRegex(ValueError, "symlinked package destination parent"):
                         publisher.create_package(files, destination)
                     self.assertEqual(sentinel.read_bytes(), b"unrelated user-owned sentinel\n")
+
+            # Lexical dot-dot paths must not sidestep the ancestor walk.
+            with self.assertRaisesRegex(ValueError, "noncanonical package destination parent"):
+                publisher.create_package(files, root / "nested" / ".." / "redirect" / "release.sublime-package")
+            self.assertEqual(sentinel.read_bytes(), b"unrelated user-owned sentinel\\n")
 
             # A symlinked ancestor should also be refused when the leaf is absent.
             with self.assertRaisesRegex(ValueError, "symlinked package destination parent"):
