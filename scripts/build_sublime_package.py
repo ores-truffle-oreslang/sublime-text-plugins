@@ -25,20 +25,26 @@ def build(dest: Path) -> str:
     resolved = dest.resolve()
     if resolved.is_relative_to(ROOT) and resolved.name in FILES:
         raise ValueError("archive cannot replace a source file")
-    dest.parent.mkdir(parents=True, exist_ok=True)
     if len(FILES) != len(set(FILES)):
         raise ValueError("duplicate package paths")
+    # Admit the complete immutable payload before opening/truncating a release
+    # artifact. A missing or symlinked later source must not destroy an
+    # existing verified destination or publish a partially written archive.
+    entries = []
+    for name in sorted(FILES):
+        source = ROOT / name
+        if not source.is_file() or source.is_symlink():
+            raise ValueError(f"missing or symlinked required release file: {name}")
+        entries.append((name, source.read_bytes()))
+    dest.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(dest, "w", compression=zipfile.ZIP_DEFLATED,
                          compresslevel=9, strict_timestamps=True) as archive:
-        for name in sorted(FILES):
-            source = ROOT / name
-            if not source.is_file() or source.is_symlink():
-                raise ValueError(f"missing or symlinked required release file: {name}")
+        for name, payload in entries:
             entry = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
             entry.create_system = 3
             entry.external_attr = 0o100644 << 16
             entry.compress_type = zipfile.ZIP_DEFLATED
-            archive.writestr(entry, source.read_bytes(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
+            archive.writestr(entry, payload, compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
     verify(dest)
     sha = hashlib.sha256(dest.read_bytes()).hexdigest()
     return sha
