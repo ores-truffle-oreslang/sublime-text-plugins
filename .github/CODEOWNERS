@@ -1,0 +1,7 @@
+# Ownership policy for Sublime package, release, grammar and CI changes.
+# Enforce through GitHub branch protection: require code owner reviews.
+* @ORESoftware
+/.github/workflows/ @ORESoftware
+/scripts/ @ORESoftware
+/tools/ @ORESoftware
+/tests/ @ORESoftware
