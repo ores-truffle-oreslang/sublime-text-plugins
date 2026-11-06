@@ -64,6 +64,10 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
 
 
 def verify_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
+    # A partial caller-provided expectation must never self-certify an archive.
+    # The same complete trusted manifest is required by create_package().
+    if set(files) != set(MEMBERS) or any(type(data) is not bytes for data in files.values()):
+        raise ValueError("package members must match the reviewed byte allowlist")
     with zipfile.ZipFile(dest, "r") as archive:
         if archive.namelist() != sorted(MEMBERS):
             raise ValueError("Archive contains unexpected package files")
