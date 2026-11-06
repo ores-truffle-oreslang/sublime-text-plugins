@@ -22,9 +22,17 @@ def build(dest: Path) -> str:
     # overwrite a trusted source file or an unrelated external sentinel.
     if dest.is_symlink():
         raise ValueError("symlinked release destination")
+    # A regular-looking output may also be a hardlink to a trusted source or
+    # unrelated file. Writing ZipFile('w') would truncate every such alias.
+    if dest.exists() and dest.stat().st_nlink > 1:
+        raise ValueError("hardlinked release destination")
     resolved = dest.resolve()
     if resolved.is_relative_to(ROOT) and resolved.name in FILES:
         raise ValueError("archive cannot replace a source file")
+    # The resolved path alone misses a distinct hardlink to a reviewed source inode.
+    # Check before opening ZipFile("w"), which would truncate the source itself.
+    if dest.is_file() and any(dest.samefile(ROOT / name) for name in FILES):
+        raise ValueError("release destination hardlinks a source file")
     dest.parent.mkdir(parents=True, exist_ok=True)
     if len(FILES) != len(set(FILES)):
         raise ValueError("duplicate package paths")
@@ -45,6 +53,10 @@ def build(dest: Path) -> str:
 
 def verify(dest: Path) -> None:
     with zipfile.ZipFile(dest) as archive:
+        # Out-of-band ZIP comments are not emitted by the reproducible builder.
+        # They can carry forged release attestations despite identical member bytes.
+        if archive.comment:
+            raise ValueError("unexpected ZIP archive comment")
         names = archive.namelist()
         if names != sorted(FILES):
             raise ValueError("release archive contains unexpected, missing or duplicate files")

@@ -150,12 +150,13 @@ def _parse_diagnostics(output, default_file):
             if (end_row is None or end_column is None or end_column > 10_000_000
                     or end_row < row or (end_row == row and end_column <= column)):
                 continue
+            # Absent/null machine origins are unlocated; a present but
+            # malformed origin must not forge diagnostics for this editor tab.
             path = item.get("path")
-            # JSON can carry NUL bytes in a forged origin; refuse the record.
-            if isinstance(path, str) and "\x00" in path:
-                continue
-            if not isinstance(path, str) or not path:
+            if path is None:
                 path = default_file
+            elif not isinstance(path, str) or not path or "\0" in path:
+                continue
             message = item.get("message")
             if not isinstance(message, str) or not message.strip():
                 continue
@@ -184,6 +185,7 @@ def _parse_diagnostics(output, default_file):
         match = _STANDARD_DIAGNOSTIC.match(line)
         if match:
             path, row, column, severity, message = match.groups()
+            # NUL-bearing legacy origins cannot be valid editor file paths.
             if "\x00" in path:
                 continue
             row, column = _text_coordinate(row), _text_coordinate(column)
