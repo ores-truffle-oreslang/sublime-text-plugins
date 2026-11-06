@@ -101,6 +101,7 @@ test('wrong app issuer, wrong SHA, and duplicate check contexts all deny',async(
 test('failed zero-step workflow is runner admission, never positive execution',async()=>{
   const f=mock();
   f.records[ROOT+'/actions/runs/51'].conclusion='failure';
+  f.job.conclusion='failure';
   f.job.steps=[];
   f.job.runner_id=0;
   const r=await inspectLiveMergeCandidate(f.args);
