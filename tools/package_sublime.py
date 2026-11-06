@@ -53,6 +53,8 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
         raise ValueError("hardlinked package destination")
     # Reject symlink redirects in parent directories before opening a ZIP.
     # A leaf-only check is insufficient when an ancestor points elsewhere.
+    if ".." in dest.parts:
+        raise ValueError("noncanonical package destination parent")
     ancestor = dest.parent
     while True:
         if ancestor.is_symlink():
