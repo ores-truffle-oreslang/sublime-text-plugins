@@ -2,7 +2,11 @@
 """Build a deterministic Sublime Text package from explicitly allowlisted files."""
 from __future__ import annotations
 
+import errno
 import hashlib
+import os
+import secrets
+import stat
 import sys
 import zipfile
 from pathlib import Path
@@ -34,31 +38,147 @@ def package_files(root: Path = ROOT) -> dict[str, bytes]:
     return content
 
 
-def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
-    # Validate the complete archive manifest BEFORE creating/truncating a file.
-    # The helper is importable by callers other than the trusted CLI entrypoint.
-    if set(files) != set(MEMBERS) or any(type(data) is not bytes for data in files.values()):
-        raise ValueError("package members must match the reviewed byte allowlist")
-    # ZipFile opens existing leaf symlinks for writing; never let a package
-    # request replace a reviewed source member or an unrelated file.
+def _validate_destination(dest: Path) -> None:
+    """Reject aliases to sources and caller-owned files before any replacement."""
     if dest.is_symlink():
         raise ValueError("symlinked package destination")
-    # More specific reviewed-source denial must precede generic hardlinks.
     if dest.resolve() in {ROOT / name for name in MEMBERS}:
         raise ValueError("package destination would replace a source file")
     if dest.is_file() and any((ROOT / name).exists() and dest.samefile(ROOT / name) for name in MEMBERS):
         raise ValueError("package destination hardlinks a reviewed source file; hardlinked package destination")
-    # Also deny aliasing unrelated caller-owned files before ZipFile("w").
     if dest.exists() and dest.stat().st_nlink > 1:
         raise ValueError("hardlinked package destination")
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(dest, "w") as archive:
-        for name in sorted(files):
-            info = zipfile.ZipInfo(name, date_time=FIXED_DATE)
-            info.compress_type = zipfile.ZIP_STORED
-            info.create_system = 3
-            info.external_attr = 0o100644 << 16
-            archive.writestr(info, files[name])
+    # A parent symlink redirects the temporary archive and the eventual
+    # replacement into an unreviewed directory. Validate every ancestor.
+    if ".." in dest.parts:
+        raise ValueError("noncanonical package destination parent")
+    ancestor = dest.parent
+    while True:
+        if ancestor.is_symlink():
+            raise ValueError("symlinked package destination parent")
+        parent = ancestor.parent
+        if parent == ancestor:
+            break
+        ancestor = parent
+
+
+def _secure_parent_fd(dest: Path) -> int:
+    """Walk to the output directory without following any parent symlinks.
+
+    Every directory handle stays anchored across path substitutions. Fail closed
+    on platforms that cannot provide no-follow and dir_fd-relative operations.
+    """
+    # CPython implements replace's dir_fd support via rename, but does not
+    # list os.replace itself in supports_dir_fd on Linux.
+    required = (os.open, os.mkdir, os.stat, os.unlink, os.rename)
+    if (os.name != "posix" or
+            not all(hasattr(os, flag) for flag in ("O_DIRECTORY", "O_NOFOLLOW")) or
+            not all(fn in os.supports_dir_fd for fn in required) or
+            os.stat not in os.supports_follow_symlinks):
+        raise ValueError("secure directory-relative package publication unsupported")
+    if ".." in dest.parts or not dest.name or dest.name in (".", ".."):
+        raise ValueError("noncanonical package destination parent")
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+    fd = os.open("/" if dest.is_absolute() else ".", flags)
+    try:
+        for component in dest.parent.parts:
+            if component in ("/", "."):
+                continue
+            try:
+                try:
+                    child = os.open(component, flags, dir_fd=fd)
+                except FileNotFoundError:
+                    os.mkdir(component, dir_fd=fd)
+                    child = os.open(component, flags, dir_fd=fd)
+            except OSError as exc:
+                if exc.errno in (errno.ELOOP, errno.ENOTDIR):
+                    raise ValueError("symlinked package destination parent") from exc
+                raise
+            os.close(fd)
+            fd = child
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _validate_anchored_destination(dest: Path, parent_fd: int) -> None:
+    """Bind the expected parent and leaf to the pinned output directory."""
+    try:
+        current_parent = os.stat(dest.parent, follow_symlinks=False)
+    except OSError as exc:
+        raise ValueError("package destination parent moved during staging") from exc
+    anchored_parent = os.fstat(parent_fd)
+    if (not stat.S_ISDIR(current_parent.st_mode) or
+            (current_parent.st_dev, current_parent.st_ino) !=
+            (anchored_parent.st_dev, anchored_parent.st_ino)):
+        raise ValueError("package destination parent moved during staging")
+    try:
+        leaf = os.stat(dest.name, dir_fd=parent_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return
+    if stat.S_ISLNK(leaf.st_mode):
+        raise ValueError("symlinked package destination")
+    if not stat.S_ISREG(leaf.st_mode):
+        raise ValueError("package destination is not a regular file")
+    for name in MEMBERS:
+        try:
+            source = os.stat(ROOT / name, follow_symlinks=False)
+        except FileNotFoundError:
+            continue
+        if (leaf.st_dev, leaf.st_ino) == (source.st_dev, source.st_ino):
+            raise ValueError("package destination hardlinks a reviewed source file")
+    if leaf.st_nlink > 1:
+        raise ValueError("hardlinked package destination")
+
+
+def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
+    # Reject malformed bytes/manifest and existing aliases before any I/O.
+    if set(files) != set(MEMBERS) or any(type(data) is not bytes for data in files.values()):
+        raise ValueError("package members must match the reviewed byte allowlist")
+    _validate_destination(dest)
+    parent_fd = _secure_parent_fd(dest)
+    staged_name: str | None = None
+    try:
+        _validate_anchored_destination(dest, parent_fd)
+        for _ in range(8):
+            candidate = ".oreslang-release-" + secrets.token_hex(16) + ".tmp"
+            try:
+                stage_fd = os.open(candidate, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                                   os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+                                   0o600, dir_fd=parent_fd)
+                staged_name = candidate
+                break
+            except FileExistsError:
+                continue
+        else:
+            raise ValueError("cannot reserve unique staging file")
+
+        # A directory swap now cannot redirect the stage to another directory:
+        # the temporary file is created relative to the pinned directory fd.
+        with os.fdopen(stage_fd, "w+b") as stream:
+            with zipfile.ZipFile(stream, "w") as archive:
+                for name in sorted(files):
+                    info = zipfile.ZipInfo(name, date_time=FIXED_DATE)
+                    info.compress_type = zipfile.ZIP_STORED
+                    info.create_system = 3
+                    info.external_attr = 0o100644 << 16
+                    archive.writestr(info, files[name])
+            stream.flush()
+            os.fsync(stream.fileno())
+
+        # The pathname recheck is an additional fail-closed signal; the actual
+        # destination and cleanup never use it. Even if swapped after this line,
+        # os.replace below is anchored to the same directory on both sides.
+        _validate_destination(dest)
+        _validate_anchored_destination(dest, parent_fd)
+        os.replace(staged_name, dest.name,
+                   src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+        staged_name = None
+    finally:
+        if staged_name is not None:
+            os.unlink(staged_name, dir_fd=parent_fd)
+        os.close(parent_fd)
 
 
 def verify_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
