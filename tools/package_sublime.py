@@ -68,7 +68,9 @@ def _secure_parent_fd(dest: Path) -> int:
     Every directory handle stays anchored across path substitutions. Fail closed
     on platforms that cannot provide no-follow and dir_fd-relative operations.
     """
-    required = (os.open, os.mkdir, os.stat, os.unlink, os.replace)
+    # CPython implements replace's dir_fd support via rename, but does not
+    # list os.replace itself in supports_dir_fd on Linux.
+    required = (os.open, os.mkdir, os.stat, os.unlink, os.rename)
     if (os.name != "posix" or
             not all(hasattr(os, flag) for flag in ("O_DIRECTORY", "O_NOFOLLOW")) or
             not all(fn in os.supports_dir_fd for fn in required) or
