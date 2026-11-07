@@ -46,6 +46,18 @@ def _validate_destination(dest: Path) -> None:
         raise ValueError("package destination hardlinks a reviewed source file; hardlinked package destination")
     if dest.exists() and dest.stat().st_nlink > 1:
         raise ValueError("hardlinked package destination")
+    # A parent symlink redirects the temporary archive and the eventual
+    # replacement into an unreviewed directory. Validate every ancestor.
+    if ".." in dest.parts:
+        raise ValueError("noncanonical package destination parent")
+    ancestor = dest.parent
+    while True:
+        if ancestor.is_symlink():
+            raise ValueError("symlinked package destination parent")
+        parent = ancestor.parent
+        if parent == ancestor:
+            break
+        ancestor = parent
 
 
 def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:

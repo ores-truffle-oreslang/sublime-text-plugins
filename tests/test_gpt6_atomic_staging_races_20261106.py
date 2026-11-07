@@ -71,6 +71,32 @@ class AtomicSublimeDestinationTests(unittest.TestCase):
         self.assertEqual(self.dest.read_bytes(), old_bytes)
         self.assert_clean_staging()
 
+    def test_parent_symlinks_and_dotdot_are_denied_before_staging(self):
+        external_dir = self.root / "external"
+        external_dir.mkdir()
+        sentinel = external_dir / "package.sublime-package"
+        sentinel.write_bytes(b"EXTERNAL SENTINEL\n")
+        redirect = self.root / "redirect"
+        try:
+            redirect.symlink_to(external_dir, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("directory symlinks unavailable")
+        for destination in (
+            redirect / sentinel.name,
+            redirect / "nested" / sentinel.name,
+        ):
+            with self.subTest(path=str(destination)):
+                with self.assertRaisesRegex(ValueError, "symlinked package destination parent"):
+                    publisher.create_package(self.files, destination)
+                self.assertEqual(sentinel.read_bytes(), b"EXTERNAL SENTINEL\n")
+                self.assertFalse((external_dir / "nested").exists())
+        with self.assertRaisesRegex(ValueError, "noncanonical package destination parent"):
+            publisher.create_package(
+                self.files, self.root / "new" / ".." / "redirect" / sentinel.name
+            )
+        self.assertEqual(sentinel.read_bytes(), b"EXTERNAL SENTINEL\n")
+        self.assert_clean_staging()
+
     def test_successful_atomic_rebuild_remains_byte_identical(self):
         publisher.create_package(self.files, self.dest)
         publisher.verify_package(self.files, self.dest)
