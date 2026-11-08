@@ -335,3 +335,65 @@ test('fake green CI with no executed steps still has zero executed jobs',async()
   assert.equal(r.merge_authorized,false);
   assert.equal(r.guest_certified,false);
 });
+
+
+test('REST transport errors never reflect bearer secrets into public denial reasons',async()=>{
+  const f=mock(),secret='Bearer PRIVATE-SIGNING-TOKEN-DO-NOT-PRINT';
+  f.args.get=async()=>{throw Error('failed to fetch with authorization: '+secret);};
+  const r=await inspectLiveMergeCandidate(f.args);
+  assert.equal(r.status,'BLOCKED');
+  assert.ok(r.reasons.includes('LIVE_READ_INCOMPLETE'));
+  assert.ok(r.reasons.includes('GITHUB_READ_FAILED_UNCLASSIFIED'));
+  assert.equal(JSON.stringify(r).includes('PRIVATE-SIGNING-TOKEN'),false);
+});
+test('GitHub 403 code is retained without exposing untrusted exception details',async()=>{
+  const f=mock();
+  f.args.get=async()=>{const e=Error('Bearer exposed-secret');e.status=403;throw e;};
+  const r=await inspectLiveMergeCandidate(f.args);
+  assert.ok(r.reasons.includes('GITHUB_READ_FAILED_403'));
+  assert.equal(JSON.stringify(r).includes('exposed-secret'),false);
+  assert.equal(r.merge_authorized,false);
+});
+test('unbounded required-jobs request is rejected before any network call',async()=>{
+  const f=mock();f.args.requiredJobs=Array.from({length:33},(_,i)=>({
+    name:'test'+i,required_steps:['Exact checkout','Security tests']
+  }));
+  const r=await inspectLiveMergeCandidate(f.args);
+  assert.deepEqual(r.reasons,['INVALID_LIVE_REQUEST']);
+  assert.equal(f.calls.length,0);
+});
+test('unbounded codeowner and artifact lists are rejected without network calls',async()=>{
+  for(const mutate of [
+    x=>{x.codeOwners=Array.from({length:65},(_,i)=>'owner'+i)},
+    x=>{x.requiredArtifacts=Array.from({length:33},(_,i)=>'artifact'+i)}
+  ]){
+    const f=mock();mutate(f.args);
+    const r=await inspectLiveMergeCandidate(f.args);
+    assert.deepEqual(r.reasons,['INVALID_LIVE_REQUEST']);
+    assert.equal(f.calls.length,0);
+  }
+});
+test('huge required job names and step names are rejected before reads',async()=>{
+  for(const mutate of [
+    x=>{x.requiredJobs[0].name='x'.repeat(129)},
+    x=>{x.requiredJobs[0].required_steps=['x'.repeat(129)]},
+    x=>{x.requiredJobs[0].required_steps=Array.from({length:17},(_,i)=>'step'+i)}
+  ]){
+    const f=mock();mutate(f.args);
+    const r=await inspectLiveMergeCandidate(f.args);
+    assert.deepEqual(r.reasons,['INVALID_LIVE_REQUEST']);
+    assert.equal(f.calls.length,0);
+  }
+});
+test('invalid artifact and codeowner types deny before GitHub reads',async()=>{
+  for(const mutate of [
+    x=>{x.requiredArtifacts=[null]},
+    x=>{x.codeOwners=['   ']},
+    x=>{x.requiredJobs=[{name:'test',required_steps:[' ']}]}
+  ]){
+    const f=mock();mutate(f.args);
+    const r=await inspectLiveMergeCandidate(f.args);
+    assert.deepEqual(r.reasons,['INVALID_LIVE_REQUEST']);
+    assert.equal(f.calls.length,0);
+  }
+});
