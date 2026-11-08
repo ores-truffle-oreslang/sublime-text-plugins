@@ -132,3 +132,77 @@ test('bounded exhaustive mutation matrix: every failed control denies', () => {
     assert.equal(result.qualified, mask === 0, 'mask=' + mask);
   }
 });
+
+
+// Candidate verification is intentionally NOT merge authorization. The shell
+// exit code may not be zero, even when an offline synthetic bundle qualifies.
+test('offline qualified snapshot exits 3, never shell-success exit 0',()=>{
+  const {mkdtempSync,writeFileSync,rmSync}=require('node:fs');
+  const {tmpdir}=require('node:os');
+  const {join,resolve}=require('node:path');
+  const {spawnSync}=require('node:child_process');
+  const dir=mkdtempSync(join(tmpdir(),'atto-local-merge-audit-'));
+  try {
+    const file=join(dir,'evidence.json');writeFileSync(file,JSON.stringify(fixture()));
+    const cmd=resolve(__dirname,'../tools/merge-qualification-policy-20261106.mjs');
+    const r=spawnSync(process.execPath,[cmd,file],{encoding:'utf8'});
+    assert.equal(r.status,3,r.stderr);
+    const result=JSON.parse(r.stdout);
+    assert.equal(result.classification,'CANDIDATE_QUALIFIED');
+    assert.equal(result.qualified,true);
+    assert.equal(result.compiler_guest_parity,false);
+    assert.ok(!Object.hasOwn(result,'merge_authorized'));
+  } finally {rmSync(dir,{recursive:true,force:true});}
+});
+test('denied offline bundle exits 1, invalid input exits 2',()=>{
+  const {mkdtempSync,writeFileSync,rmSync}=require('node:fs');
+  const {tmpdir}=require('node:os');
+  const {join,resolve}=require('node:path');
+  const {spawnSync}=require('node:child_process');
+  const dir=mkdtempSync(join(tmpdir(),'atto-local-merge-audit-'));
+  try {
+    const file=join(dir,'evidence.json'),cmd=resolve(__dirname,
+      '../tools/merge-qualification-policy-20261106.mjs');
+    const bad=fixture();bad.pr.draft=true;writeFileSync(file,JSON.stringify(bad));
+    assert.equal(spawnSync(process.execPath,[cmd,file]).status,1);
+    writeFileSync(file,Buffer.from([0xff,0xfe,0x7b]));
+    assert.equal(spawnSync(process.execPath,[cmd,file]).status,2);
+    assert.equal(spawnSync(process.execPath,[cmd,'--unknown']).status,2);
+  } finally {rmSync(dir,{recursive:true,force:true});}
+});
+test('input reader rejects ambiguous JSON, invalid UTF-8 and oversized bytes',async()=>{
+  const {readBundle}=await import('../tools/merge-qualification-policy-20261106.mjs');
+  const {mkdtempSync,writeFileSync,rmSync}=require('node:fs');
+  const {tmpdir}=require('node:os');const {join}=require('node:path');
+  const dir=mkdtempSync(join(tmpdir(),'atto-local-merge-audit-'));
+  try {
+    const file=join(dir,'evidence.json'),source=JSON.stringify(fixture());
+    for(const bytes of [
+      source+'\n', JSON.stringify(fixture(),null,2),
+      source.replace('{"expected":','{"expected":{},"expected":'),
+      Buffer.from([0xff,0xfe,0x7b,0x7d]),
+      Buffer.alloc(262145,0x20),Buffer.alloc(0)
+    ]) {
+      writeFileSync(file,bytes);
+      assert.throws(()=>readBundle(file),'invalid source bundle must reject');
+    }
+    writeFileSync(file,source);
+    assert.equal(readBundle(file).expected.number,7);
+  }finally {rmSync(dir,{recursive:true,force:true});}
+});
+test('evidence reader rejects symbolic links and multiply-linked files',async()=>{
+  const {readBundle}=await import('../tools/merge-qualification-policy-20261106.mjs');
+  const {mkdtempSync,writeFileSync,symlinkSync,linkSync,rmSync}=require('node:fs');
+  const {tmpdir}=require('node:os');const {join}=require('node:path');
+  const dir=mkdtempSync(join(tmpdir(),'atto-local-merge-audit-'));
+  try {
+    const file=join(dir,'evidence.json'),link=join(dir,'symlink'),
+      hard=join(dir,'hardlink');
+    writeFileSync(file,JSON.stringify(fixture()));
+    symlinkSync(file,link);
+    assert.throws(()=>readBundle(link));
+    linkSync(file,hard);
+    assert.throws(()=>readBundle(file));
+    assert.throws(()=>readBundle(hard));
+  }finally{rmSync(dir,{recursive:true,force:true});}
+});

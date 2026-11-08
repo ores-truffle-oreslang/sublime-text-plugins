@@ -147,18 +147,35 @@ export function readBundle(path) {
     throw new Error('unsafe or missing input path');
   const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
-    const stat = fstatSync(fd);
-    if (!stat.isFile() || stat.size < 1 || stat.size > 262144)
-      throw new Error('input must be regular file <=256 KiB');
-    const buf = Buffer.alloc(262145);
-    let len = 0;
-    while (len < buf.length) {
-      const n = readSync(fd, buf, len, buf.length - len, null);
-      if (n === 0) break;
-      len += n;
+    // Pin the descriptor; reject nonregular, multiply-linked and changing
+    // evidence. A successful stat alone is not an authenticated source.
+    const before = fstatSync(fd, { bigint: true });
+    if (!before.isFile() || before.nlink !== 1n ||
+        before.size < 1n || before.size > 262144n)
+      throw new Error('input must be a singly-linked bounded regular file');
+    const bytes = Buffer.alloc(Number(before.size));
+    let count = 0;
+    while (count < bytes.length) {
+      const n = readSync(fd, bytes, count, bytes.length - count, null);
+      if (n === 0) throw new Error('input truncated while reading');
+      count += n;
     }
-    if (len === 0 || len > 262144) throw new Error('truncated or oversized input');
-    return JSON.parse(buf.toString('utf8', 0, len));
+    // Reading exactly the original size is insufficient if the file grew.
+    if (readSync(fd, Buffer.alloc(1), 0, 1, null) !== 0)
+      throw new Error('input grew while reading');
+    const after = fstatSync(fd, { bigint: true });
+    if (!after.isFile() || after.nlink !== 1n ||
+        before.dev !== after.dev || before.ino !== after.ino ||
+        before.size !== after.size ||
+        before.mtimeNs !== after.mtimeNs || before.ctimeNs !== after.ctimeNs)
+      throw new Error('input changed during evidence read');
+    const source = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    const parsed = JSON.parse(source);
+    // Reject ambiguous duplicate object keys, unnormalized byte forms and
+    // padded JSON in an externally supplied, source-free evidence snapshot.
+    if (JSON.stringify(parsed) !== source)
+      throw new Error('noncanonical evidence JSON');
+    return parsed;
   } finally {
     closeSync(fd);
   }
@@ -169,7 +186,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     if (process.argv.length !== 3) throw new Error('usage: node tools/merge-qualification-policy-20261106.mjs evidence.json');
     const result = qualifyMergeEvidence(readBundle(process.argv[2]));
     process.stdout.write(JSON.stringify(result) + '\n');
-    if (!result.qualified) process.exitCode = 1;
+    // A self-supplied offline bundle is never merge authorization.
+    // Success-shaped local candidates must NOT return exit 0 for shell gates.
+    process.exitCode = result.qualified ? 3 : 1;
   } catch (err) {
     process.stderr.write(JSON.stringify(denied('INPUT_ERROR: ' + err.message)) + '\n');
     process.exitCode = 2;
