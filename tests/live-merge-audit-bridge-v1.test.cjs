@@ -270,12 +270,16 @@ test('declared oversize Content-Length is denied even with a tiny body',async()=
     new Response('{}',{status:200,headers:{'content-length':'1024'}})});
   await assert.rejects(get(ROOT+'/pulls/7'),/GITHUB_BODY_TOO_LARGE/);
 });
-test('incomplete second review page cannot be treated as a full history',async()=>{
+test('malformed second review page cannot be treated as a full history',async()=>{
   const f=mock();
   const one=f.records[ROOT+'/pulls/7/reviews?per_page=100&page=1'][0];
   f.records[ROOT+'/pulls/7/reviews?per_page=100&page=1']=
     Array.from({length:100},(_,i)=>({...copy(one),id:1000+i}));
-  f.records[ROOT+'/pulls/7/reviews?per_page=100&page=2']=[];
+  // A 100-item first page followed by an empty page is legitimate; instead
+  // inject an invalid entry in the second page to prove fail-closed parsing.
+  f.records[ROOT+'/pulls/7/reviews?per_page=100&page=2']=[
+    {...copy(one),id:2001},null
+  ];
   const r=await inspectLiveMergeCandidate(f.args);
   assert.ok(r.reasons.includes('LIVE_READ_INCOMPLETE'));
   assert.equal(r.merge_authorized,false);
