@@ -15,9 +15,16 @@ const boundedText = (s, max = 128) => typeof s === 'string' &&
   s.length > 0 && s.length <= max && s === s.trim();
 // Never echo arbitrary GitHub, transport or caller error messages in a
 // candidate's public reason list; exception messages may embed bearer tokens.
-const readFailureCode = error => Number.isInteger(error?.status) &&
-  error.status >= 400 && error.status <= 599
-    ? 'GITHUB_READ_FAILED_' + error.status : 'GITHUB_READ_FAILED_UNCLASSIFIED';
+const readFailureCode = error => {
+  try {
+    const status = error?.status;
+    if (Number.isInteger(status) && status >= 400 && status <= 599)
+      return 'GITHUB_READ_FAILED_' + status;
+  } catch {
+    // Even an adversarial throwing accessor on an Error cannot escape.
+  }
+  return 'GITHUB_READ_FAILED_UNCLASSIFIED';
+};
 
 export function githubRestReader({ token, fetcher = fetch, maxBytes = MAX_BYTES } = {}) {
   if (typeof token !== 'string' || !token.length || typeof fetcher !== 'function' ||
