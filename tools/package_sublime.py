@@ -175,6 +175,12 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
         os.replace(staged_name, dest.name,
                    src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
         staged_name = None
+        # A pinned fd prevents clobbering a foreign directory, but does not
+        # alone prove that the caller's destination pathname still names it.
+        # Detect a parent/leaf swap during the final rename rather than
+        # reporting successful publication to a stale or redirected path.
+        _validate_destination(dest)
+        _validate_anchored_destination(dest, parent_fd)
     finally:
         if staged_name is not None:
             os.unlink(staged_name, dir_fd=parent_fd)
