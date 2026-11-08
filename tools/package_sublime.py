@@ -96,6 +96,10 @@ def _secure_parent_fd(dest: Path) -> int:
                 raise
             os.close(fd)
             fd = child
+        # A shared-writable final parent permits another uid to race the
+        # visible staging basename. Refuse that trust boundary at admission.
+        if os.fstat(fd).st_mode & 0o022:
+            raise ValueError("unsafe shared-writable package destination parent")
         return fd
     except BaseException:
         os.close(fd)
