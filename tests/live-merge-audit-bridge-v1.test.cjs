@@ -223,3 +223,115 @@ test('transport denies traversal, redirected credentials, oversized and non-200 
     new Response('no', {status:403})});
   await assert.rejects(forbidden(ROOT+'/pulls/7'),/GITHUB_READ_FAILED_403/);
 });
+
+
+// Wave 2: more adversarial live metadata, transport, pagination and TOCTOU
+// checks. All outcomes remain read-only and non-authorizing.
+test('REST client denies invalid token, transport, and body bounds before fetch',()=>{
+  for (const options of [
+    {},{token:''},{token:'secret',fetcher:null},
+    {token:'secret',maxBytes:255},{token:'secret',maxBytes:1048577},
+    {token:'secret',maxBytes:NaN},{token:'secret',maxBytes:1.5}
+  ]) assert.throws(()=>githubRestReader(options),/requires token/);
+});
+test('REST reader denies nonexistent and out-of-range page and attempt identities',async()=>{
+  let reads=0;
+  const get=githubRestReader({token:'secret',fetcher:async()=>{reads++;throw Error('SHOULD_NOT_FETCH');}});
+  for(const path of [
+    ROOT+'/pulls/7/reviews?per_page=100&page=0',
+    ROOT+'/pulls/7/reviews?per_page=100&page=9',
+    ROOT+'/pulls/7/reviews?per_page=100&page=01',
+    ROOT+'/actions/runs/51/attempts/0/jobs?per_page=100&page=1',
+    ROOT+'/actions/runs/51/attempts/1/jobs?per_page=100&page=9',
+    ROOT+'/actions/runs/51/artifacts?per_page=100&page=999',
+    ROOT+'/commits/'+A+'/check-runs?per_page=100&page=-1',
+    ROOT+'/actions/runs/51/rerun',
+    ROOT+'/git/trees/'+A
+  ]) await assert.rejects(get(path),/READ_PATH_DENIED/);
+  assert.equal(reads,0);
+});
+test('HTTP 200 without an observable response body is not a valid JSON receipt',async()=>{
+  const get=githubRestReader({token:'secret',fetcher:async()=>
+    new Response(null,{status:200})});
+  await assert.rejects(get(ROOT+'/pulls/7'),/GITHUB_BODY_UNOBSERVED/);
+});
+test('HTTP 200 with invalid UTF-8 cannot enter a trusted JSON evidence model',async()=>{
+  const get=githubRestReader({token:'secret',fetcher:async()=>
+    new Response(Uint8Array.of(0xff,0xfe,0x7b,0x7d),{status:200})});
+  await assert.rejects(get(ROOT+'/pulls/7'),/GITHUB_BODY_INVALID_JSON/);
+});
+test('HTTP 200 with truncated JSON is rejected rather than assumed empty',async()=>{
+  const get=githubRestReader({token:'secret',fetcher:async()=>
+    new Response('{"pr":true', {status:200})});
+  await assert.rejects(get(ROOT+'/pulls/7'),/GITHUB_BODY_INVALID_JSON/);
+});
+test('declared oversize Content-Length is denied even with a tiny body',async()=>{
+  const get=githubRestReader({token:'secret',maxBytes:512,fetcher:async()=>
+    new Response('{}',{status:200,headers:{'content-length':'1024'}})});
+  await assert.rejects(get(ROOT+'/pulls/7'),/GITHUB_BODY_TOO_LARGE/);
+});
+test('malformed second review page cannot be treated as a full history',async()=>{
+  const f=mock();
+  const one=f.records[ROOT+'/pulls/7/reviews?per_page=100&page=1'][0];
+  f.records[ROOT+'/pulls/7/reviews?per_page=100&page=1']=
+    Array.from({length:100},(_,i)=>({...copy(one),id:1000+i}));
+  // A 100-item first page followed by an empty page is legitimate; instead
+  // inject an invalid entry in the second page to prove fail-closed parsing.
+  f.records[ROOT+'/pulls/7/reviews?per_page=100&page=2']=[
+    {...copy(one),id:2001},null
+  ];
+  const r=await inspectLiveMergeCandidate(f.args);
+  assert.ok(r.reasons.includes('LIVE_READ_INCOMPLETE'));
+  assert.equal(r.merge_authorized,false);
+});
+test('declared total_count changing between two job pages fails closed',async()=>{
+  const f=mock();
+  const jobs=Array.from({length:100},(_,i)=>({...copy(f.job),id:500+i}));
+  f.records[ROOT+'/actions/runs/51/attempts/1/jobs?per_page=100&page=1']={
+    total_count:101,jobs
+  };
+  f.records[ROOT+'/actions/runs/51/attempts/1/jobs?per_page=100&page=2']={
+    total_count:102,jobs:[{...copy(f.job),id:601}]
+  };
+  const r=await inspectLiveMergeCandidate(f.args);
+  assert.ok(r.reasons.includes('LIVE_READ_INCOMPLETE'));
+});
+test('duplicate different-ID required job names cannot masquerade as one job',async()=>{
+  const f=mock();
+  f.records[ROOT+'/actions/runs/51/attempts/1/jobs?per_page=100&page=1']={
+    total_count:2,jobs:[copy(f.job),{...copy(f.job),id:72}]
+  };
+  const r=await inspectLiveMergeCandidate(f.args);
+  assert.ok(r.reasons.includes('REQUIRED_JOB_AMBIGUOUS'));
+  assert.equal(r.merge_authorized,false);
+});
+test('stale base SHA or PR base branch is rejected before any authorization',async()=>{
+  for(const change of [
+    f=>{f.pr.base.sha='c'.repeat(40)},
+    f=>{f.pr.base.ref='feature'}
+  ]){
+    const f=mock();change(f);
+    const r=await inspectLiveMergeCandidate(f.args);
+    assert.ok(r.reasons.includes(f.pr.base.ref!=='main' ?
+      'PR_OR_TREE_IDENTITY_UNVERIFIED':'BASE_OR_PROTECTION_UNVERIFIED'));
+  }
+});
+test('late branch-protection downgrade is observable as governance drift',async()=>{
+  const f=mock(),get=f.args.get;let reads=0;
+  f.args.get=async path=>{
+    const value=await get(path);
+    if(path===ROOT+'/branches/main'&&++reads===2)value.protected=false;
+    return value;
+  };
+  const r=await inspectLiveMergeCandidate(f.args);
+  assert.ok(r.reasons.includes('SOURCE_OR_GOVERNANCE_DRIFT'));
+  assert.equal(r.merge_authorized,false);
+});
+test('fake green CI with no executed steps still has zero executed jobs',async()=>{
+  const f=mock();f.job.steps=[];f.job.runner_id=0;
+  const r=await inspectLiveMergeCandidate(f.args);
+  assert.equal(r.observed.executed_jobs,0);
+  assert.equal(r.status,'BLOCKED');
+  assert.equal(r.merge_authorized,false);
+  assert.equal(r.guest_certified,false);
+});
