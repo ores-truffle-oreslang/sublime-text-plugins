@@ -139,6 +139,7 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
     _validate_destination(dest)
     parent_fd = _secure_parent_fd(dest)
     staged_name: str | None = None
+    staged_identity: tuple[int, int] | None = None
     try:
         _validate_anchored_destination(dest, parent_fd)
         for _ in range(8):
@@ -148,6 +149,8 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
                                    os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
                                    0o600, dir_fd=parent_fd)
                 staged_name = candidate
+                staged_stat = os.fstat(stage_fd)
+                staged_identity = (staged_stat.st_dev, staged_stat.st_ino)
                 break
             except FileExistsError:
                 continue
@@ -172,6 +175,16 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
         # os.replace below is anchored to the same directory on both sides.
         _validate_destination(dest)
         _validate_anchored_destination(dest, parent_fd)
+        # The temporary name must still refer to the inode written through
+        # our pinned fd. An attacker with same-directory write access can
+        # replace a visible staging pathname while its write fd stays open.
+        try:
+            staged_leaf = os.stat(staged_name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError as exc:
+            raise ValueError("staged archive pathname replaced during publication") from exc
+        if (not stat.S_ISREG(staged_leaf.st_mode) or staged_leaf.st_nlink != 1 or
+                (staged_leaf.st_dev, staged_leaf.st_ino) != staged_identity):
+            raise ValueError("staged archive pathname replaced during publication")
         os.replace(staged_name, dest.name,
                    src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
         staged_name = None
