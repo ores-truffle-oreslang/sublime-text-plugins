@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import errno
 import os
+import stat
 import tempfile
 import unittest
 import zipfile
@@ -47,6 +48,32 @@ class PublisherRollbackTests(unittest.TestCase):
         self.assertEqual(len(stage_descriptors), 1)
         with self.assertRaises(OSError):
             os.fstat(stage_descriptors[0])
+        self.assert_unchanged()
+
+    def test_stage_inode_stat_failure_closes_fd_and_preserves_unknown_stage_name(self):
+        original_fstat = os.fstat
+        stage_descriptors = []
+
+        def fail_regular_file_stat(fd):
+            info = original_fstat(fd)
+            if not stage_descriptors and stat.S_ISREG(info.st_mode):
+                stage_descriptors.append(fd)
+                raise OSError(errno.EIO, "injected staging fstat failure")
+            return info
+
+        with patch.object(publisher.os, "fstat", side_effect=fail_regular_file_stat):
+            with self.assertRaisesRegex(OSError, "injected staging fstat failure"):
+                publisher.create_package(self.files, self.destination)
+        self.assertEqual(len(stage_descriptors), 1)
+        with self.assertRaises(OSError):
+            os.fstat(stage_descriptors[0])
+        # The publisher could not authenticate its created inode because
+        # fstat failed. It deliberately leaves an unverified temporary name
+        # rather than unlinking a file another actor might have substituted.
+        leftovers = list(self.directory.glob(".oreslang-release-*.tmp"))
+        self.assertEqual(len(leftovers), 1)
+        self.assertEqual(self.destination.read_bytes(), self.previous)
+        leftovers[0].unlink()
         self.assert_unchanged()
 
     def test_fsync_failure_cleans_stage_and_preserves_previous_artifact(self):
