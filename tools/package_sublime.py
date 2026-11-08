@@ -163,7 +163,15 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
 
         # A directory swap now cannot redirect the stage to another directory:
         # the temporary file is created relative to the pinned directory fd.
-        with os.fdopen(stage_fd, "w+b") as stream:
+        # fdopen() may fail before ownership of the raw stage fd transfers
+        # to a Python file object. Close it explicitly on that path; otherwise
+        # the temporary file cleanup succeeds but the descriptor leaks.
+        try:
+            stage_stream = os.fdopen(stage_fd, "w+b")
+        except BaseException:
+            os.close(stage_fd)
+            raise
+        with stage_stream as stream:
             with zipfile.ZipFile(stream, "w") as archive:
                 for name in sorted(files):
                     info = zipfile.ZipInfo(name, date_time=FIXED_DATE)
