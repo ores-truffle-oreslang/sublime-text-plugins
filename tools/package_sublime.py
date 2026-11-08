@@ -166,6 +166,8 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
                     archive.writestr(info, files[name])
             stream.flush()
             os.fsync(stream.fileno())
+            staged_stat = os.fstat(stream.fileno())
+            staged_identity = (staged_stat.st_dev, staged_stat.st_ino)
 
         # The pathname recheck is an additional fail-closed signal; the actual
         # destination and cleanup never use it. Even if swapped after this line,
@@ -181,6 +183,12 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
         # reporting successful publication to a stale or redirected path.
         _validate_destination(dest)
         _validate_anchored_destination(dest, parent_fd)
+        # A concurrent writer may swap in a different ordinary single-linked
+        # file after the rename. Checking only its file type is insufficient.
+        # Require readback of the exact inode that held our staged ZIP.
+        published_stat = os.stat(dest.name, dir_fd=parent_fd, follow_symlinks=False)
+        if (published_stat.st_dev, published_stat.st_ino) != staged_identity:
+            raise ValueError("package output changed after atomic replace")
     finally:
         if staged_name is not None:
             os.unlink(staged_name, dir_fd=parent_fd)
