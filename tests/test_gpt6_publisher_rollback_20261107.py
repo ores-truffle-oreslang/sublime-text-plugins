@@ -129,6 +129,17 @@ class PublisherRollbackTests(unittest.TestCase):
             outside_alias.unlink(missing_ok=True)
         self.assert_unchanged()
 
+    def test_shared_writable_output_directory_rejected_before_staging(self):
+        for writable_mode in (0o770, 0o777):
+            with self.subTest(mode=oct(writable_mode)):
+                self.directory.chmod(writable_mode)
+                try:
+                    with self.assertRaisesRegex(ValueError, "unsafe shared-writable package destination parent"):
+                        publisher.create_package(self.files, self.destination)
+                finally:
+                    self.directory.chmod(0o700)
+                self.assert_unchanged()
+
     def test_success_after_failed_publish_still_produces_verified_deterministic_bytes(self):
         with patch.object(publisher.os, "replace",
                           side_effect=OSError(errno.EACCES, "simulated denial")):
