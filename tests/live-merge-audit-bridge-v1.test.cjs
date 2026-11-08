@@ -397,3 +397,19 @@ test('invalid artifact and codeowner types deny before GitHub reads',async()=>{
     assert.equal(f.calls.length,0);
   }
 });
+
+
+test('adversarial throwing Error.status getter cannot escape fail-closed reporting',async()=>{
+  const f=mock(),marker='SECRET-THROWING-STATUS';
+  f.args.get=async()=>{
+    const error=Error('untrusted '+marker);
+    Object.defineProperty(error,'status',{get(){throw Error(marker)}});
+    throw error;
+  };
+  let result;
+  await assert.doesNotReject(async()=>{result=await inspectLiveMergeCandidate(f.args)});
+  assert.equal(result.status,'BLOCKED');
+  assert.ok(result.reasons.includes('GITHUB_READ_FAILED_UNCLASSIFIED'));
+  assert.equal(JSON.stringify(result).includes(marker),false);
+  assert.equal(result.merge_authorized,false);
+});
