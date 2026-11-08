@@ -77,8 +77,10 @@ class PinnedDirectorySwapTests(unittest.TestCase):
             return original(*args, **kwargs)
 
         with patch.object(publisher.os, "replace", side_effect=swap_just_before_replace):
-            publisher.create_package(self.files, self.dest)
-        # The directory descriptor is pinned to the original inode, now moved.
+            with self.assertRaisesRegex(ValueError, "symlinked package destination parent"):
+                publisher.create_package(self.files, self.dest)
+        # The package still lands only in the original pinned directory inode.
+        # It must NOT report successful publication at the now-redirected path.
         publisher.verify_package(self.files, self.moved / self.dest.name)
         self.assert_external_unchanged()
 
