@@ -90,6 +90,13 @@ class PublisherRollbackTests(unittest.TestCase):
         with patch.object(publisher.zipfile, "ZipFile", side_effect=replace_visible_stage):
             with self.assertRaisesRegex(ValueError, "staged archive pathname replaced"):
                 publisher.create_package(self.files, self.destination)
+        # The substituted file is not ours; refusing publication must not
+        # erase another actor's data while cleaning up our old staging fd.
+        leftover = list(self.directory.glob(".oreslang-release-*.tmp"))
+        self.assertEqual(len(leftover), 1)
+        self.assertEqual(leftover[0].read_bytes(), planted)
+        self.assertEqual(self.destination.read_bytes(), self.previous)
+        leftover[0].unlink()
         self.assert_unchanged()
 
     def test_staged_archive_name_swapped_for_symlink_cannot_publish_external_file(self):
@@ -110,8 +117,66 @@ class PublisherRollbackTests(unittest.TestCase):
         with patch.object(publisher.zipfile, "ZipFile", side_effect=install_stage_symlink):
             with self.assertRaisesRegex(ValueError, "staged archive pathname replaced"):
                 publisher.create_package(self.files, self.destination)
-        self.assert_unchanged()
+        leftover = list(self.directory.glob(".oreslang-release-*.tmp"))
+        self.assertEqual(len(leftover), 1)
+        self.assertTrue(leftover[0].is_symlink())
         self.assertEqual(external.read_bytes(), b"EXTERNAL FILE MUST REMAIN UNTOUCHED\n")
+        self.assertEqual(self.destination.read_bytes(), self.previous)
+        leftover[0].unlink()
+        self.assert_unchanged()
+
+    def test_removed_stage_name_does_not_mask_publication_denial(self):
+        original_zip = zipfile.ZipFile
+
+        def remove_visible_stage(stream, *args, **kwargs):
+            stages = list(self.directory.glob(".oreslang-release-*.tmp"))
+            self.assertEqual(len(stages), 1)
+            stages[0].unlink()
+            return original_zip(stream, *args, **kwargs)
+
+        with patch.object(publisher.zipfile, "ZipFile", side_effect=remove_visible_stage):
+            with self.assertRaisesRegex(ValueError, "staged archive pathname replaced"):
+                publisher.create_package(self.files, self.destination)
+        self.assert_unchanged()
+
+    def test_hardlinked_victim_replacing_stage_is_never_deleted_by_cleanup(self):
+        victim = self.directory / "independent-victim"
+        original_data = b"INDEPENDENT USER OWNED HARDLINK TARGET\n"
+        victim.write_bytes(original_data)
+        original_zip = zipfile.ZipFile
+
+        def swap_with_victim_hardlink(stream, *args, **kwargs):
+            stages = list(self.directory.glob(".oreslang-release-*.tmp"))
+            self.assertEqual(len(stages), 1)
+            stages[0].unlink()
+            os.link(victim, stages[0])
+            return original_zip(stream, *args, **kwargs)
+
+        with patch.object(publisher.zipfile, "ZipFile", side_effect=swap_with_victim_hardlink):
+            with self.assertRaisesRegex(ValueError, "staged archive pathname replaced"):
+                publisher.create_package(self.files, self.destination)
+        leftover = list(self.directory.glob(".oreslang-release-*.tmp"))
+        self.assertEqual(len(leftover), 1)
+        self.assertTrue(leftover[0].samefile(victim))
+        self.assertEqual(victim.read_bytes(), original_data)
+        self.assertEqual(self.destination.read_bytes(), self.previous)
+        leftover[0].unlink()
+        self.assert_unchanged()
+
+    def test_shared_writable_permission_change_during_stage_fails_closed(self):
+        original_zip = zipfile.ZipFile
+
+        def enable_shared_writes(stream, *args, **kwargs):
+            self.directory.chmod(0o777)
+            return original_zip(stream, *args, **kwargs)
+
+        try:
+            with patch.object(publisher.zipfile, "ZipFile", side_effect=enable_shared_writes):
+                with self.assertRaisesRegex(ValueError, "unsafe shared-writable package destination parent"):
+                    publisher.create_package(self.files, self.destination)
+        finally:
+            self.directory.chmod(0o700)
+        self.assert_unchanged()
 
     def test_staged_archive_hardlink_alias_is_rejected(self):
         original_zip = zipfile.ZipFile
