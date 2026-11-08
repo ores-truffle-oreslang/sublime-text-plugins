@@ -32,6 +32,26 @@ class PublisherRollbackTests(unittest.TestCase):
         self.assertEqual(self.destination.read_bytes(), self.previous)
         self.assertEqual(list(self.directory.glob(".oreslang-release-*.tmp")), [])
 
+    def test_stage_stream_open_failure_does_not_leak_raw_descriptor(self):
+        original_open = os.open
+        stage_descriptors = []
+
+        def record_stage_open(file, *args, **kwargs):
+            fd = original_open(file, *args, **kwargs)
+            if isinstance(file, str) and file.startswith(".oreslang-release-"):
+                stage_descriptors.append(fd)
+            return fd
+
+        with patch.object(publisher.os, "open", side_effect=record_stage_open):
+            with patch.object(publisher.os, "fdopen",
+                              side_effect=OSError(errno.ENOMEM, "injected fdopen failure")):
+                with self.assertRaisesRegex(OSError, "injected fdopen failure"):
+                    publisher.create_package(self.files, self.destination)
+        self.assertEqual(len(stage_descriptors), 1)
+        with self.assertRaises(OSError):
+            os.fstat(stage_descriptors[0])
+        self.assert_unchanged()
+
     def test_fsync_failure_cleans_stage_and_preserves_previous_artifact(self):
         with patch.object(publisher.os, "fsync",
                           side_effect=OSError(errno.EIO, "injected fsync failure")):
