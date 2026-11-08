@@ -179,6 +179,9 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
         # os.replace below is anchored to the same directory on both sides.
         _validate_destination(dest)
         _validate_anchored_destination(dest, parent_fd)
+        # The parent may have become shared-writable after initial admission.
+        if os.fstat(parent_fd).st_mode & 0o022:
+            raise ValueError("unsafe shared-writable package destination parent")
         # The temporary name must still refer to the inode written through
         # our pinned fd. An attacker with same-directory write access can
         # replace a visible staging pathname while its write fd stays open.
@@ -193,9 +196,24 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
                    src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
         staged_name = None
     finally:
-        if staged_name is not None:
-            os.unlink(staged_name, dir_fd=parent_fd)
-        os.close(parent_fd)
+        try:
+            if staged_name is not None:
+                # Never delete a different caller-owned inode substituted for
+                # our staged name. Missing stages are already gone; do not let
+                # cleanup obscure the original fail-closed exception.
+                try:
+                    remaining = os.stat(staged_name, dir_fd=parent_fd,
+                                        follow_symlinks=False)
+                except FileNotFoundError:
+                    pass
+                else:
+                    if (remaining.st_dev, remaining.st_ino) == staged_identity:
+                        try:
+                            os.unlink(staged_name, dir_fd=parent_fd)
+                        except FileNotFoundError:
+                            pass
+        finally:
+            os.close(parent_fd)
 
 
 def verify_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
