@@ -11,6 +11,13 @@ const BLOCK = (reasons, observed = {}, policy = null) =>
   ({ status: 'BLOCKED', merge_authorized: false, guest_certified: false,
      source_authenticated: false, reasons: [...new Set(reasons)], observed, policy });
 const MAX_BYTES = 1024 * 1024;
+const boundedText = (s, max = 128) => typeof s === 'string' &&
+  s.length > 0 && s.length <= max && s === s.trim();
+// Never echo arbitrary GitHub, transport or caller error messages in a
+// candidate's public reason list; exception messages may embed bearer tokens.
+const readFailureCode = error => Number.isInteger(error?.status) &&
+  error.status >= 400 && error.status <= 599
+    ? 'GITHUB_READ_FAILED_' + error.status : 'GITHUB_READ_FAILED_UNCLASSIFIED';
 
 export function githubRestReader({ token, fetcher = fetch, maxBytes = MAX_BYTES } = {}) {
   if (typeof token !== 'string' || !token.length || typeof fetcher !== 'function' ||
@@ -110,12 +117,15 @@ export async function inspectLiveMergeCandidate({
   const errors = [];
   if (typeof get !== 'function' || typeof repository !== 'string' || !REPO.test(repository) ||
       !goodId(number) || !goodId(runId) || !goodId(attempt) || !validSHA(expectedHead) ||
-      !Array.isArray(requiredJobs) || requiredJobs.length === 0 ||
-      !requiredJobs.every(j => j && typeof j.name === 'string' &&
-        Array.isArray(j.required_steps) && j.required_steps.length > 0) ||
+      !Array.isArray(requiredJobs) || requiredJobs.length === 0 || requiredJobs.length > 32 ||
+      !requiredJobs.every(j => j && boundedText(j.name) &&
+        Array.isArray(j.required_steps) && j.required_steps.length > 0 &&
+        j.required_steps.length <= 16 &&
+        j.required_steps.every(x => boundedText(x))) ||
       !Array.isArray(codeOwners) || codeOwners.length === 0 ||
-      !codeOwners.every(x => typeof x === 'string' && x.length > 0) ||
-      !Array.isArray(requiredArtifacts))
+      codeOwners.length > 64 || !codeOwners.every(x => boundedText(x)) ||
+      !Array.isArray(requiredArtifacts) || requiredArtifacts.length > 32 ||
+      !requiredArtifacts.every(x => boundedText(x)))
     return BLOCK(['INVALID_LIVE_REQUEST']);
   const base = '/repos/' + repository;
   let pr, branch, protection, commit, run, reviews, allJobs, checks, artifacts;
@@ -131,7 +141,7 @@ export async function inspectLiveMergeCandidate({
     checks = await paged(get, base + '/commits/' + expectedHead + '/check-runs', 'check_runs');
     artifacts = await paged(get, base + '/actions/runs/' + runId + '/artifacts', 'artifacts');
   } catch (e) {
-    return BLOCK(['LIVE_READ_INCOMPLETE', String(e?.message || 'UNKNOWN').slice(0,120)]);
+    return BLOCK(['LIVE_READ_INCOMPLETE', readFailureCode(e)]);
   }
   const head = pr?.head?.sha, tree = commit?.tree?.sha;
   if (head !== expectedHead || commit?.sha !== expectedHead || !validSHA(tree) ||
