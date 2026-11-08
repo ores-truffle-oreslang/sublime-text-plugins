@@ -76,6 +76,59 @@ class PublisherRollbackTests(unittest.TestCase):
         self.assertEqual(occupied.read_bytes(), sentinel)
         self.assertEqual(list(self.directory.glob(".oreslang-release-*.tmp")), [occupied])
 
+    def test_staged_archive_name_replaced_during_zip_write_fails_closed(self):
+        original_zip = zipfile.ZipFile
+        planted = b"ATTACKER-CONTROLLED ZIP BYTES\n"
+
+        def replace_visible_stage(stream, *args, **kwargs):
+            stage_paths = list(self.directory.glob(".oreslang-release-*.tmp"))
+            self.assertEqual(len(stage_paths), 1)
+            stage_paths[0].unlink()
+            stage_paths[0].write_bytes(planted)
+            return original_zip(stream, *args, **kwargs)
+
+        with patch.object(publisher.zipfile, "ZipFile", side_effect=replace_visible_stage):
+            with self.assertRaisesRegex(ValueError, "staged archive pathname replaced"):
+                publisher.create_package(self.files, self.destination)
+        self.assert_unchanged()
+
+    def test_staged_archive_name_swapped_for_symlink_cannot_publish_external_file(self):
+        external = self.directory / "external-sentinel"
+        external.write_bytes(b"EXTERNAL FILE MUST REMAIN UNTOUCHED\n")
+        original_zip = zipfile.ZipFile
+
+        def install_stage_symlink(stream, *args, **kwargs):
+            stage_paths = list(self.directory.glob(".oreslang-release-*.tmp"))
+            self.assertEqual(len(stage_paths), 1)
+            stage_paths[0].unlink()
+            try:
+                stage_paths[0].symlink_to(external)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlink creation unsupported")
+            return original_zip(stream, *args, **kwargs)
+
+        with patch.object(publisher.zipfile, "ZipFile", side_effect=install_stage_symlink):
+            with self.assertRaisesRegex(ValueError, "staged archive pathname replaced"):
+                publisher.create_package(self.files, self.destination)
+        self.assert_unchanged()
+        self.assertEqual(external.read_bytes(), b"EXTERNAL FILE MUST REMAIN UNTOUCHED\n")
+
+    def test_staged_archive_hardlink_alias_is_rejected(self):
+        original_zip = zipfile.ZipFile
+        outside_alias = self.directory / "outside-alias"
+        def hardlink_staged_file(stream, *args, **kwargs):
+            stages = list(self.directory.glob(".oreslang-release-*.tmp"))
+            self.assertEqual(len(stages), 1)
+            os.link(stages[0], outside_alias)
+            return original_zip(stream, *args, **kwargs)
+        try:
+            with patch.object(publisher.zipfile, "ZipFile", side_effect=hardlink_staged_file):
+                with self.assertRaisesRegex(ValueError, "staged archive pathname replaced"):
+                    publisher.create_package(self.files, self.destination)
+        finally:
+            outside_alias.unlink(missing_ok=True)
+        self.assert_unchanged()
+
     def test_success_after_failed_publish_still_produces_verified_deterministic_bytes(self):
         with patch.object(publisher.os, "replace",
                           side_effect=OSError(errno.EACCES, "simulated denial")):
