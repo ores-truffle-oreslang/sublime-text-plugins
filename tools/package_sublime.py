@@ -153,7 +153,14 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
                                    os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
                                    0o600, dir_fd=parent_fd)
                 staged_name = candidate
-                staged_stat = os.fstat(stage_fd)
+                try:
+                    staged_stat = os.fstat(stage_fd)
+                except BaseException:
+                    # A descriptor can be opened successfully while its inode
+                    # inspection fails. Close it. Without a trusted inode id,
+                    # cleanup must not unlink a name an attacker could replace.
+                    os.close(stage_fd)
+                    raise
                 staged_identity = (staged_stat.st_dev, staged_stat.st_ino)
                 break
             except FileExistsError:
