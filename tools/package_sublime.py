@@ -210,6 +210,16 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
         os.replace(staged_name, dest.name,
                    src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
         staged_name = None
+        # A pinned handle prevents redirecting this rename to a foreign
+        # directory. Verify that the caller-visible destination still names
+        # that parent and the exact inode written through our staging fd.
+        _validate_destination(dest)
+        _validate_anchored_destination(dest, parent_fd)
+        if os.fstat(parent_fd).st_mode & 0o022:
+            raise ValueError("unsafe shared-writable package destination parent")
+        published_stat = os.stat(dest.name, dir_fd=parent_fd, follow_symlinks=False)
+        if (published_stat.st_dev, published_stat.st_ino) != staged_identity:
+            raise ValueError("package output changed after atomic replace")
     finally:
         try:
             if staged_name is not None:
