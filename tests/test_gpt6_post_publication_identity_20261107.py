@@ -56,6 +56,10 @@ class PostPublicationIdentityTests(unittest.TestCase):
 
         def substitute_unrelated_regular_file(*args, **kwargs):
             result = actual(*args, **kwargs)
+            # Keep the freshly published inode alive to prevent the FS from
+            # recycling its number when the attacker installs another file.
+            original_fd = os.open(self.dest, os.O_RDONLY)
+            self.addCleanup(os.close, original_fd)
             self.dest.unlink()
             self.dest.write_bytes(b"FOREIGN REGULAR FILE\n")
             return result
