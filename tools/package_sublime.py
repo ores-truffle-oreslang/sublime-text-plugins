@@ -153,7 +153,14 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
                                    os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
                                    0o600, dir_fd=parent_fd)
                 staged_name = candidate
-                staged_stat = os.fstat(stage_fd)
+                try:
+                    staged_stat = os.fstat(stage_fd)
+                except BaseException:
+                    # A descriptor can be opened successfully while its inode
+                    # inspection fails. Close it. Without a trusted inode id,
+                    # cleanup must not unlink a name an attacker could replace.
+                    os.close(stage_fd)
+                    raise
                 staged_identity = (staged_stat.st_dev, staged_stat.st_ino)
                 break
             except FileExistsError:
@@ -163,7 +170,15 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
 
         # A directory swap now cannot redirect the stage to another directory:
         # the temporary file is created relative to the pinned directory fd.
-        with os.fdopen(stage_fd, "w+b") as stream:
+        # fdopen() may fail before ownership of the raw stage fd transfers
+        # to a Python file object. Close it explicitly on that path; otherwise
+        # the temporary file cleanup succeeds but the descriptor leaks.
+        try:
+            stage_stream = os.fdopen(stage_fd, "w+b")
+        except BaseException:
+            os.close(stage_fd)
+            raise
+        with stage_stream as stream:
             with zipfile.ZipFile(stream, "w") as archive:
                 for name in sorted(files):
                     info = zipfile.ZipInfo(name, date_time=FIXED_DATE)
