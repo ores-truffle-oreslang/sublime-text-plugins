@@ -1,7 +1,9 @@
+# Either listed trusted account may independently approve; never the PR author.
+# An active branch ruleset is required to ENFORCE these declarations.
 # Ownership policy for Sublime package, release, grammar and CI changes.
 # Enforce through GitHub branch protection: require code owner reviews.
-* @ORESoftware
-/.github/workflows/ @ORESoftware
-/scripts/ @ORESoftware
-/tools/ @ORESoftware
-/tests/ @ORESoftware
+* @ORESoftware @the1mills
+/.github/workflows/ @ORESoftware @the1mills
+/scripts/ @ORESoftware @the1mills
+/tools/ @ORESoftware @the1mills
+/tests/ @ORESoftware @the1mills
