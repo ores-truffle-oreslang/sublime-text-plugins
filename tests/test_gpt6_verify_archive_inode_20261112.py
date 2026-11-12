@@ -50,11 +50,9 @@ class VerifiedArchiveIdentityTests(unittest.TestCase):
     def test_mutated_regular_archive_never_self_certifies(self):
         with self.archive.open("ab") as out:
             out.write(b"unreviewed trailing bytes")
-        # zipfile may ignore trailing bytes; a canonical manifest with the
-        # same member bytes is not by itself a full archive-byte identity.
-        # A successful parser does not grant independent release approval.
-        # Here we only require that the file is still a regular pinned inode.
-        pkg.verify_package(self.files, self.archive)
+        # zipfile may accept trailing overlays. Full canonical bytes must not.
+        with self.assertRaisesRegex(ValueError, "noncanonical archive bytes"):
+            pkg.verify_package(self.files, self.archive)
 
 
 if __name__ == "__main__":

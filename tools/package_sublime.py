@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import errno
 import hashlib
+import io
 import os
 import secrets
 import stat
@@ -281,6 +282,19 @@ def verify_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
                             info.extra or info.comment or
                             archive.read(name) != expected):
                         raise ValueError("Package verification failed: " + name)
+            # Reject appended payloads, ZIP overlays and alternate container
+            # layouts even when the member manifest itself looks correct.
+            expected_bytes = io.BytesIO()
+            with zipfile.ZipFile(expected_bytes, "w") as canonical:
+                for member in sorted(files):
+                    entry = zipfile.ZipInfo(member, date_time=FIXED_DATE)
+                    entry.compress_type = zipfile.ZIP_STORED
+                    entry.create_system = 3
+                    entry.external_attr = 0o100644 << 16
+                    canonical.writestr(entry, files[member])
+            stream.seek(0)
+            if stream.read() != expected_bytes.getvalue():
+                raise ValueError("Package verification failed: noncanonical archive bytes")
             # Verify the caller-visible path still names the checked inode.
             final = os.stat(dest, follow_symlinks=False)
             if identity(opened) != identity(final) or final.st_nlink != 1:
