@@ -96,7 +96,11 @@ def _verified_entry_ok(entry: object, source_sha: str, digest: str,
     timestamps = verification.get("verifiedTimestamps")
     if not isinstance(certificate, dict) or not isinstance(statement, dict):
         return False
-    if not isinstance(timestamps, list) or len(timestamps) == 0:
+    # A nonempty list of arbitrary scalars is not structured verification
+    # metadata. This is shape validation only; `gh attestation verify` must
+    # have succeeded cryptographically before these claims are read.
+    if (not isinstance(timestamps, list) or not timestamps
+            or any(not isinstance(t, dict) or not t for t in timestamps)):
         return False
     expected_cert = {
         "issuer": OIDC_ISSUER,
