@@ -50,20 +50,22 @@ class CandidateZipReadIdentityTests(unittest.TestCase):
         self.assertEqual(self.path.stat().st_size, len(self.data))
 
     def test_disappearing_path_fails_closed(self):
-        original_stat = os.stat
-        calls = [0]
+        original_read = os.read
+        touched = [False]
 
-        def disappear_after_read(path, *args, **kwargs):
-            if str(path) == str(self.path):
-                calls[0] += 1
-                if calls[0] == 1:
-                    self.path.unlink()
-                    raise FileNotFoundError(str(path))
-            return original_stat(path, *args, **kwargs)
+        def unlink_after_first_read(fd, size):
+            chunk = original_read(fd, size)
+            if chunk and not touched[0]:
+                touched[0] = True
+                self.path.unlink()
+            return chunk
 
-        with patch.object(auditor.os, "stat", side_effect=disappear_after_read):
+        # The pathname must disappear AFTER the initial symlink admission,
+        # not before Path.is_symlink() has examined it.
+        with patch.object(auditor.os, "read", side_effect=unlink_after_first_read):
             with self.assertRaisesRegex(auditor.AuditDenied, "ZIP_MUTATED_DURING_READ"):
                 auditor._read_zip_bytes(self.path)
+        self.assertTrue(touched[0])
 
 
 if __name__ == "__main__":
