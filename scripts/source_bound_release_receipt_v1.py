@@ -47,10 +47,19 @@ def _safe_path(root: Path, relative: str) -> Path:
     if any(part in {"", ".", ".."} for part in parts) or len(parts) < 2:
         raise ReceiptDenied("UNSAFE_ARTIFACT_PATH")
     path = root.joinpath(*parts)
-    # Parent must be an ordinary directory within the current Git checkout.
-    if not path.parent.is_dir() or path.parent.is_symlink() or (
-        not path.parent.resolve().is_relative_to(root.resolve())
-    ):
+    # A symlink in ANY ancestor can alias another checkout location even if
+    # the resolved path remains beneath root. Reject such aliases and non-
+    # directories before a receipt or artifact is opened or created.
+    current = root
+    for component in parts[:-1]:
+        current = current / component
+        try:
+            entry = os.lstat(current)
+        except OSError as exc:
+            raise ReceiptDenied("UNSAFE_ARTIFACT_PARENT") from exc
+        if not stat.S_ISDIR(entry.st_mode):
+            raise ReceiptDenied("UNSAFE_ARTIFACT_PARENT")
+    if not path.parent.resolve().is_relative_to(root.resolve()):
         raise ReceiptDenied("UNSAFE_ARTIFACT_PARENT")
     return path
 
