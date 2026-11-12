@@ -96,6 +96,10 @@ def _secure_parent_fd(dest: Path) -> int:
                 raise
             os.close(fd)
             fd = child
+        # A shared-writable final parent permits another uid to race the
+        # visible staging basename. Refuse that trust boundary at admission.
+        if os.fstat(fd).st_mode & 0o022:
+            raise ValueError("unsafe shared-writable package destination parent")
         return fd
     except BaseException:
         os.close(fd)
@@ -139,6 +143,7 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
     _validate_destination(dest)
     parent_fd = _secure_parent_fd(dest)
     staged_name: str | None = None
+    staged_identity: tuple[int, int] | None = None
     try:
         _validate_anchored_destination(dest, parent_fd)
         for _ in range(8):
@@ -148,6 +153,15 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
                                    os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
                                    0o600, dir_fd=parent_fd)
                 staged_name = candidate
+                try:
+                    staged_stat = os.fstat(stage_fd)
+                except BaseException:
+                    # A descriptor can be opened successfully while its inode
+                    # inspection fails. Close it. Without a trusted inode id,
+                    # cleanup must not unlink a name an attacker could replace.
+                    os.close(stage_fd)
+                    raise
+                staged_identity = (staged_stat.st_dev, staged_stat.st_ino)
                 break
             except FileExistsError:
                 continue
@@ -156,7 +170,15 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
 
         # A directory swap now cannot redirect the stage to another directory:
         # the temporary file is created relative to the pinned directory fd.
-        with os.fdopen(stage_fd, "w+b") as stream:
+        # fdopen() may fail before ownership of the raw stage fd transfers
+        # to a Python file object. Close it explicitly on that path; otherwise
+        # the temporary file cleanup succeeds but the descriptor leaks.
+        try:
+            stage_stream = os.fdopen(stage_fd, "w+b")
+        except BaseException:
+            os.close(stage_fd)
+            raise
+        with stage_stream as stream:
             with zipfile.ZipFile(stream, "w") as archive:
                 for name in sorted(files):
                     info = zipfile.ZipInfo(name, date_time=FIXED_DATE)
@@ -172,13 +194,41 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
         # os.replace below is anchored to the same directory on both sides.
         _validate_destination(dest)
         _validate_anchored_destination(dest, parent_fd)
+        # The parent may have become shared-writable after initial admission.
+        if os.fstat(parent_fd).st_mode & 0o022:
+            raise ValueError("unsafe shared-writable package destination parent")
+        # The temporary name must still refer to the inode written through
+        # our pinned fd. An attacker with same-directory write access can
+        # replace a visible staging pathname while its write fd stays open.
+        try:
+            staged_leaf = os.stat(staged_name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError as exc:
+            raise ValueError("staged archive pathname replaced during publication") from exc
+        if (not stat.S_ISREG(staged_leaf.st_mode) or staged_leaf.st_nlink != 1 or
+                (staged_leaf.st_dev, staged_leaf.st_ino) != staged_identity):
+            raise ValueError("staged archive pathname replaced during publication")
         os.replace(staged_name, dest.name,
                    src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
         staged_name = None
     finally:
-        if staged_name is not None:
-            os.unlink(staged_name, dir_fd=parent_fd)
-        os.close(parent_fd)
+        try:
+            if staged_name is not None:
+                # Never delete a different caller-owned inode substituted for
+                # our staged name. Missing stages are already gone; do not let
+                # cleanup obscure the original fail-closed exception.
+                try:
+                    remaining = os.stat(staged_name, dir_fd=parent_fd,
+                                        follow_symlinks=False)
+                except FileNotFoundError:
+                    pass
+                else:
+                    if (remaining.st_dev, remaining.st_ino) == staged_identity:
+                        try:
+                            os.unlink(staged_name, dir_fd=parent_fd)
+                        except FileNotFoundError:
+                            pass
+        finally:
+            os.close(parent_fd)
 
 
 def verify_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
