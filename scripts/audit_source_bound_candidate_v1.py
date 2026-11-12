@@ -75,6 +75,15 @@ def github_get_json(token: str, path: str):
 def _read_zip_bytes(path: Path) -> bytes:
     if not isinstance(path, Path) or path.is_symlink():
         raise AuditDenied("ZIP_SYMLINK_OR_PATH_INVALID")
+    # Do not permit a symlinked ancestor to redirect a candidate artifact to
+    # another directory after its caller-visible path is selected.
+    try:
+        for ancestor in path.parents:
+            parent = os.lstat(ancestor)
+            if not stat.S_ISDIR(parent.st_mode):
+                raise AuditDenied("ZIP_SYMLINK_OR_PATH_INVALID")
+    except OSError as exc:
+        raise AuditDenied("ZIP_SYMLINK_OR_PATH_INVALID") from exc
     try:
         fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except OSError as exc:
@@ -94,8 +103,18 @@ def _read_zip_bytes(path: Path) -> bytes:
                 raise AuditDenied("ZIP_OVERSIZED")
         if size != st.st_size:
             raise AuditDenied("ZIP_MUTATED_DURING_READ")
-        current = os.stat(path, follow_symlinks=False)
-        if (current.st_dev, current.st_ino, current.st_mtime_ns) != (st.st_dev, st.st_ino, st.st_mtime_ns):
+        # Compare both ends of the pinned descriptor, not just its name.
+        # A same-inode edit can preserve size and fool pathname-only checks.
+        after = os.fstat(fd)
+        try:
+            current = os.stat(path, follow_symlinks=False)
+        except OSError as exc:
+            raise AuditDenied("ZIP_MUTATED_DURING_READ") from exc
+        identity = lambda s: (s.st_dev, s.st_ino, s.st_size,
+                              s.st_nlink, s.st_mtime_ns, s.st_ctime_ns)
+        if (identity(st) != identity(after) or
+                identity(st) != identity(current) or current.st_nlink != 1 or
+                not stat.S_ISREG(current.st_mode)):
             raise AuditDenied("ZIP_MUTATED_DURING_READ")
         return b"".join(chunks)
     finally:
