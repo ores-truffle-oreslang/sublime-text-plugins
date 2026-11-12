@@ -243,28 +243,51 @@ def create_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
 
 def verify_package(files: dict[str, bytes], dest: Path = PACKAGE) -> None:
     # A partial caller-provided expectation must never self-certify an archive.
-    # The same complete trusted manifest is required by create_package().
     if set(files) != set(MEMBERS) or any(type(data) is not bytes for data in files.values()):
         raise ValueError("package members must match the reviewed byte allowlist")
-    with zipfile.ZipFile(dest, "r") as archive:
-        # The packager emits no global ZIP comment. Reject metadata-only
-        # changes even when member contents and canonical names are unchanged.
-        if archive.comment:
-            raise ValueError("Package verification failed: unexpected archive comment")
-        if archive.namelist() != sorted(MEMBERS):
-            raise ValueError("Archive contains unexpected package files")
-        for name, expected in files.items():
-            info = archive.getinfo(name)
-            # Canonical package members must be regular Unix files. The source
-            # bytes alone do not bind a ZIP entry's file type or permissions:
-            # a tampered archive could otherwise advertise a symlink.
-            if (info.create_system != 3 or
-                    info.external_attr != (0o100644 << 16) or
-                    info.compress_type != zipfile.ZIP_STORED or
-                    info.date_time != FIXED_DATE or
-                    info.extra or info.comment or
-                    archive.read(name) != expected):
-                raise ValueError("Package verification failed: " + name)
+    # Do not inspect archive bytes through a path that can resolve to another
+    # person's symlink, hardlink, FIFO or a substituted inode. Package creation
+    # already requires no-follow directory handles; verification must not
+    # silently weaken that property.
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise ValueError("Package verification failed: no-follow unavailable")
+    try:
+        initial = os.stat(dest, follow_symlinks=False)
+        if not stat.S_ISREG(initial.st_mode) or initial.st_nlink != 1:
+            raise ValueError("Package verification failed: nonregular or linked archive")
+        flags = os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_CLOEXEC", 0)
+        fd = os.open(dest, flags)
+    except OSError as exc:
+        raise ValueError("Package verification failed: unsafe archive path") from exc
+    try:
+        opened = os.fstat(fd)
+        identity = lambda s: (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
+        if (not stat.S_ISREG(opened.st_mode) or opened.st_nlink != 1
+                or identity(initial) != identity(opened)):
+            raise ValueError("Package verification failed: archive changed before open")
+        with os.fdopen(fd, "rb") as stream:
+            fd = -1
+            with zipfile.ZipFile(stream, "r") as archive:
+                if archive.comment:
+                    raise ValueError("Package verification failed: unexpected archive comment")
+                if archive.namelist() != sorted(MEMBERS):
+                    raise ValueError("Archive contains unexpected package files")
+                for name, expected in files.items():
+                    info = archive.getinfo(name)
+                    if (info.create_system != 3 or
+                            info.external_attr != (0o100644 << 16) or
+                            info.compress_type != zipfile.ZIP_STORED or
+                            info.date_time != FIXED_DATE or
+                            info.extra or info.comment or
+                            archive.read(name) != expected):
+                        raise ValueError("Package verification failed: " + name)
+            # Verify the caller-visible path still names the checked inode.
+            final = os.stat(dest, follow_symlinks=False)
+            if identity(opened) != identity(final) or final.st_nlink != 1:
+                raise ValueError("Package verification failed: archive changed during verification")
+    finally:
+        if fd >= 0:
+            os.close(fd)
 
 
 if __name__ == "__main__":
