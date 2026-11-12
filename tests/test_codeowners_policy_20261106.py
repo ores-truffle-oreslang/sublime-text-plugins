@@ -5,13 +5,13 @@ from pathlib import Path
 
 POLICY = Path(__file__).resolve().parents[1] / ".github" / "CODEOWNERS"
 EXPECTED = (
-    ("*", "@ORESoftware"),
-    ("/.github/workflows/", "@ORESoftware"),
-    ("/scripts/", "@ORESoftware"),
-    ("/tools/", "@ORESoftware"),
-    ("/tests/", "@ORESoftware"),
+    ("*", ("@ORESoftware", "@the1mills")),
+    ("/.github/workflows/", ("@ORESoftware", "@the1mills")),
+    ("/scripts/", ("@ORESoftware", "@the1mills")),
+    ("/tools/", ("@ORESoftware", "@the1mills")),
+    ("/tests/", ("@ORESoftware", "@the1mills")),
 )
-ALLOWED = re.compile(r"(?:\*|/[A-Za-z0-9_./-]+/) @[A-Za-z0-9-]+\Z")
+ALLOWED = re.compile(r"(?:\*|/[A-Za-z0-9_./-]+/) @[A-Za-z0-9-]+(?: @[A-Za-z0-9-]+)*\Z")
 
 
 def parse_policy(text):
@@ -23,10 +23,12 @@ def parse_policy(text):
             continue
         if not ALLOWED.fullmatch(line):
             raise ValueError(f"invalid CODEOWNERS entry on line {lineno}")
-        pattern, owner = line.split()
-        if (pattern, owner) in result:
+        pattern, *owners = line.split()
+        if len(set(owners)) != len(owners):
+            raise ValueError("duplicate CODEOWNERS owner")
+        if (pattern, tuple(owners)) in result:
             raise ValueError("duplicate CODEOWNERS entry")
-        result.append((pattern, owner))
+        result.append((pattern, tuple(owners)))
     return tuple(result)
 
 
@@ -67,10 +69,10 @@ class CodeownersPolicyTests(unittest.TestCase):
             "README.md",
         ):
             with self.subTest(path=path):
-                self.assertEqual(owners_for(path, policy), "@ORESoftware")
+                self.assertEqual(owners_for(path, policy), ("@ORESoftware", "@the1mills"))
 
     def test_missing_default_owner_fails_closed(self):
-        data = POLICY.read_text(encoding="utf-8").replace("* @ORESoftware\n", "")
+        data = POLICY.read_text(encoding="utf-8").replace("* @ORESoftware @the1mills\n", "")
         with self.assertRaisesRegex(ValueError, "policy drift"):
             require_policy(data)
 
@@ -84,6 +86,10 @@ class CodeownersPolicyTests(unittest.TestCase):
             with self.subTest(text=text):
                 with self.assertRaisesRegex(ValueError, "invalid CODEOWNERS"):
                     parse_policy(text)
+
+    def test_duplicate_owner_on_one_rule_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "duplicate CODEOWNERS owner"):
+            parse_policy("* @ORESoftware @ORESoftware\n")
 
     def test_duplicate_owner_entry_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "duplicate CODEOWNERS"):
